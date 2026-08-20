@@ -17,3 +17,40 @@ body {
 .fc {
   background: #fff;
 }
+
+/* --- Багшийн гар утасны хэсэг --- */
+
+/* Доод таб цэсний ард агуулга нуугдахаас сэргийлнэ (iPhone-ийн home indicator багтаана). */
+.teacher-shell {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.teacher-tabbar {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Мэдээллийн мөр — гар утсанд хүснэгтийн оронд. */
+.lesson-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: #fff;
+}
+
+.lesson-card--done {
+  background: #fafafa;
+}
+
+/* Хүрэх талбай хамгийн багадаа 44px — Apple/Google-ийн зөвлөмж. */
+.touch-btn {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+/* Хүснэгтийг гар утсанд илүү нягт болгоно. */
+@media (max-width: 640px) {
+  .ant-table {
+    font-size: 13px;
+  }
+}

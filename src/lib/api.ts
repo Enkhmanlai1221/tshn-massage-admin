@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:7000";
 
-export const TOKEN_KEY = "massage.accessToken";
+export const TOKEN_KEY = "music-erp.accessToken";
 
 export const getToken = (): string | null => {
   if (typeof window === "undefined") return null;

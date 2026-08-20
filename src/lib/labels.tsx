@@ -1,43 +1,99 @@
 import { Tag } from "antd";
 
-// Захиалгын төлөв — монгол шошго + өнгө (нэг эх сурвалж)
-export const STATUS_LABEL: Record<string, string> = {
-  BOOKED: "Захиалсан",
-  CONFIRMED: "Баталгаажсан",
-  COMPLETED: "Дууссан",
-  CANCELED: "Цуцалсан",
-  NO_SHOW: "Ирээгүй",
+/** Хичээлийн төлөв — монгол шошго + өнгө (backend-ийн LESSON.ts-тэй нэг эх сурвалж). */
+export const LESSON_STATUS_LABEL: Record<string, string> = {
+  SCHEDULED: "Товлогдсон",
+  ATTENDED: "Ирсэн",
+  ABSENT: "Тасалсан",
+  EXCUSED: "Чөлөөтэй",
+  TEACHER_LEAVE: "Багш чөлөөтэй",
+  MOVED: "Зөөгдсөн",
+  CANCELLED: "Цуцалсан",
 };
 
-export const STATUS_COLOR: Record<string, string> = {
-  BOOKED: "#3b82f6",
-  CONFIRMED: "#8b5cf6",
-  COMPLETED: "#22c55e",
-  CANCELED: "#ef4444",
-  NO_SHOW: "#a1a1aa",
+export const LESSON_STATUS_COLOR: Record<string, string> = {
+  SCHEDULED: "#3b82f6",
+  ATTENDED: "#22c55e",
+  ABSENT: "#ef4444",
+  EXCUSED: "#f59e0b",
+  TEACHER_LEAVE: "#a855f7",
+  MOVED: "#a1a1aa",
+  CANCELLED: "#71717a",
 };
 
-// Төлбөрийн арга — монгол шошго + өнгө
-export const METHOD_LABEL: Record<string, string> = {
-  CASH: "Бэлэн",
-  CARD: "Карт",
+export const LESSON_TYPE_LABEL: Record<string, string> = {
+  REGULAR: "Ердийн",
+  MAKEUP: "Нөхөх",
+  TRIAL: "Туршилт",
 };
 
-export const METHOD_COLOR: Record<string, string> = {
-  CASH: "#22c55e",
-  CARD: "#3b82f6",
+export const STUDENT_LEVEL_LABEL: Record<string, string> = {
+  BEGINNER: "Эхлэн суралцагч",
+  INTERMEDIATE: "Дунд",
+  ADVANCED: "Ахисан",
 };
 
-export function StatusTag({ status }: { status?: string }) {
+export const STUDENT_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Идэвхтэй",
+  PAUSED: "Завсарласан",
+  LEFT: "Гарсан",
+};
+
+export const STUDENT_STATUS_COLOR: Record<string, string> = {
+  ACTIVE: "green",
+  PAUSED: "orange",
+  LEFT: "default",
+};
+
+export const GENDER_LABEL: Record<string, string> = {
+  MALE: "Эрэгтэй",
+  FEMALE: "Эмэгтэй",
+};
+
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  PAID: "Төлсөн",
+  UNPAID: "Төлөөгүй",
+};
+
+export const SALARY_STATUS_LABEL: Record<string, string> = {
+  DRAFT: "Ноорог",
+  PAID: "Олгосон",
+};
+
+export const ENROLLMENT_STATUS_LABEL: Record<string, string> = {
+  ACTIVE: "Идэвхтэй",
+  PAUSED: "Түр зогссон",
+  ENDED: "Дууссан",
+};
+
+/** 0=Ням ... 6=Бямба */
+export const WEEKDAY_LABEL = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
+export const WEEKDAY_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
+
+export const money = (n?: number | null) =>
+  `${(n ?? 0).toLocaleString("mn-MN")}₮`;
+
+/** 555 → "09:15" */
+export const minuteLabel = (m: number) =>
+  `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+export function LessonStatusTag({ status }: { status?: string }) {
   if (!status) return <Tag>—</Tag>;
   return (
-    <Tag color={STATUS_COLOR[status]}>{STATUS_LABEL[status] || status}</Tag>
+    <Tag color={LESSON_STATUS_COLOR[status]}>
+      {LESSON_STATUS_LABEL[status] || status}
+    </Tag>
   );
 }
 
-export function MethodTag({ method }: { method?: string }) {
-  if (!method) return <Tag>—</Tag>;
+export function StudentStatusTag({ status }: { status?: string }) {
+  if (!status) return <Tag>—</Tag>;
   return (
-    <Tag color={METHOD_COLOR[method]}>{METHOD_LABEL[method] || method}</Tag>
+    <Tag color={STUDENT_STATUS_COLOR[status]}>
+      {STUDENT_STATUS_LABEL[status] || status}
+    </Tag>
   );
 }
+
+export const studentName = (s: any) =>
+  s ? [s.lastName, s.firstName].filter(Boolean).join(" ") : "—";

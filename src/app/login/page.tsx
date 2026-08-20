@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Form, Input, Typography, App } from "antd";
+import Link from "next/link";
+import { Button, Card, Divider, Form, Input, Typography, App } from "antd";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import { useAuth } from "@/lib/auth";
 import { apiError } from "@/lib/api";
@@ -36,17 +37,22 @@ export default function LoginPage() {
       <Card style={{ width: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            🧖 Массаж салон
+            🎵 Хөгжмийн сургууль
           </Typography.Title>
-          <Typography.Text type="secondary">Удирдлагын самбар</Typography.Text>
+          <Typography.Text type="secondary">
+            Админ / менежерийн хэсэг
+          </Typography.Text>
         </div>
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
             name="email"
             label="Имэйл"
-            rules={[{ required: true, message: "Имэйл оруулна уу" }]}
+            rules={[
+              { required: true, message: "Имэйл оруулна уу" },
+              { type: "email", message: "Имэйл буруу байна (жишээ: admin@music.mn)" },
+            ]}
           >
-            <Input prefix={<MailOutlined />} placeholder="admin@massage.mn" />
+            <Input prefix={<MailOutlined />} placeholder="admin@music.mn" />
           </Form.Item>
           <Form.Item
             name="password"
@@ -59,6 +65,14 @@ export default function LoginPage() {
             Нэвтрэх
           </Button>
         </Form>
+        <Divider plain style={{ marginBottom: 8 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Багш уу?
+          </Typography.Text>
+        </Divider>
+        <Link href="/teacher/login">
+          <Button block>Багшийн хэсэг рүү (утсаар нэвтрэх)</Button>
+        </Link>
       </Card>
     </div>
   );

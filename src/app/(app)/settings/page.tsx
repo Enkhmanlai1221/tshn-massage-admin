@@ -2,39 +2,27 @@
 
 import { useEffect } from "react";
 import {
+  App,
+  Alert,
+  Button,
   Card,
+  Checkbox,
   Form,
   Input,
   InputNumber,
-  Button,
-  Select,
+  Space,
+  Table,
+  Tag,
   Typography,
-  Spin,
-  App,
-  Row,
-  Col,
-  TimePicker,
 } from "antd";
-import dayjs from "dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
-
-const WEEKDAYS = [
-  { value: 1, label: "Даваа" },
-  { value: 2, label: "Мягмар" },
-  { value: 3, label: "Лхагва" },
-  { value: 4, label: "Пүрэв" },
-  { value: 5, label: "Баасан" },
-  { value: 6, label: "Бямба" },
-  { value: 0, label: "Ням" },
-];
-
-// минут → dayjs (өнөөдрийн эхэн + минут)
-const minToDayjs = (min: number) => dayjs().startOf("day").add(min, "minute");
-const dayjsToMin = (d: dayjs.Dayjs) => d.hour() * 60 + d.minute();
+import { useAuth } from "@/lib/auth";
+import { WEEKDAY_LABEL, minuteLabel } from "@/lib/labels";
 
 export default function SettingsPage() {
   const { message } = App.useApp();
+  const { can } = useAuth();
   const qc = useQueryClient();
   const [form] = Form.useForm();
 
@@ -44,107 +32,122 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (data) {
-      form.setFieldsValue({
-        ...data,
-        open: minToDayjs(data.openMinute),
-        close: minToDayjs(data.closeMinute),
-      });
-    }
+    if (data) form.setFieldsValue(data);
   }, [data, form]);
 
   const save = useMutation({
-    mutationFn: async (values: any) => {
-      const payload = {
-        ...values,
-        openMinute: dayjsToMin(values.open),
-        closeMinute: dayjsToMin(values.close),
-      };
-      delete payload.open;
-      delete payload.close;
-      return api.put("/setting", payload);
-    },
-    onSuccess: () => {
-      message.success("Хадгаллаа");
+    mutationFn: async (v: any) => api.put("/setting", v),
+    onSuccess: (res) => {
+      message.success(res.data.message);
       qc.invalidateQueries({ queryKey: ["setting"] });
     },
     onError: (e) => message.error(apiError(e)),
   });
 
-  if (isLoading) return <Spin />;
+  const editable = can("SETTING", "isEdit");
 
   return (
     <div>
-      <Typography.Title level={3}>Салоны тохиргоо</Typography.Title>
-      <Card style={{ maxWidth: 640 }}>
-        <Form form={form} layout="vertical" onFinish={(v) => save.mutate(v)}>
-          <Form.Item name="name" label="Салоны нэр">
-            <Input />
-          </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="phone" label="Утас">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="currency" label="Валют">
-                <Input />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item name="address" label="Хаяг">
-            <Input />
-          </Form.Item>
+      <Typography.Title level={4}>Тохиргоо</Typography.Title>
+      <Form
+        form={form}
+        layout="vertical"
+        disabled={!editable}
+        onFinish={(v) => save.mutate(v)}
+      >
+        <Card size="small" title="Ерөнхий" loading={isLoading}>
+          <Space wrap align="start">
+            <Form.Item name="name" label="Сургуулийн нэр" style={{ width: 280 }}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label="Утас" style={{ width: 180 }}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="address" label="Хаяг" style={{ width: 320 }}>
+              <Input />
+            </Form.Item>
+          </Space>
+        </Card>
+
+        <Card size="small" title="Хичээлийн дүрэм" style={{ marginTop: 16 }}>
+          <Space wrap align="start" size="large">
+            <Form.Item
+              name="lessonDuration"
+              label="Хичээлийн үргэлжлэх хугацаа (мин)"
+              style={{ width: 240 }}
+            >
+              <InputNumber min={5} max={240} style={{ width: "100%" }} />
+            </Form.Item>
+            <Form.Item
+              name="absenceStrikeLimit"
+              label="Тасалтын сануулгын хязгаар"
+              extra="Сурагч сард энэ тооноос ИЛҮҮ тасалбал багшид цалин тооцно."
+              style={{ width: 280 }}
+            >
+              <InputNumber min={0} max={20} style={{ width: "100%" }} />
+            </Form.Item>
+          </Space>
           <Form.Item name="workingDays" label="Ажлын өдрүүд">
-            <Select mode="multiple" options={WEEKDAYS} />
+            <Checkbox.Group
+              options={WEEKDAY_LABEL.map((label, value) => ({ label, value }))}
+            />
           </Form.Item>
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item name="open" label="Нээх цаг">
-                <TimePicker
-                  format="HH:mm"
-                  minuteStep={15}
-                  style={{ width: "100%" }}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="close" label="Хаах цаг">
-                <TimePicker
-                  format="HH:mm"
-                  minuteStep={15}
-                  style={{ width: "100%" }}
-                />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item name="slotMinutes" label="Slot (мин)">
-                <Select
-                  options={[5, 10, 15, 30, 60].map((v) => ({
-                    value: v,
-                    label: `${v} мин`,
-                  }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="defaultBufferMinutes" label="Завсарлага (мин)">
-                <InputNumber min={0} max={240} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="loyaltyEarnPercent" label="Loyalty оноо (%)">
-                <InputNumber min={0} max={100} style={{ width: "100%" }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Button type="primary" htmlType="submit" loading={save.isPending}>
+        </Card>
+
+        {editable && (
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={save.isPending}
+            style={{ marginTop: 16 }}
+          >
             Хадгалах
           </Button>
-        </Form>
+        )}
+      </Form>
+
+      <Card size="small" title="Хичээлийн цагийн сүлжээ" style={{ marginTop: 16 }}>
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Цагийн сүлжээ өөрчлөх нь зөвхөн ШИНЭ хичээлд нөлөөлнө"
+          description="Аль хэдийн товлогдсон хичээлүүд өөрсдийн цагийг хадгалдаг тул хөндөгдөхгүй."
+        />
+        <Table
+          size="small"
+          rowKey="index"
+          dataSource={data?.timeSlots || []}
+          pagination={false}
+          columns={[
+            { title: "#", dataIndex: "index", width: 60 },
+            {
+              title: "Эхлэх",
+              dataIndex: "startMinute",
+              render: (v) => minuteLabel(v),
+            },
+            {
+              title: "Дуусах",
+              dataIndex: "endMinute",
+              render: (v) => minuteLabel(v),
+            },
+            {
+              title: "Үргэлжлэх",
+              key: "dur",
+              render: (_, r: any) => `${r.endMinute - r.startMinute} мин`,
+            },
+            {
+              title: "Дараагийн хүртэл завсарлага",
+              key: "gap",
+              render: (_, r: any, i) => {
+                const next = data?.timeSlots?.[i + 1];
+                if (!next) return "—";
+                const gap = next.startMinute - r.endMinute;
+                return gap ? <Tag color="orange">{gap} мин</Tag> : "—";
+              },
+            },
+          ]}
+        />
       </Card>
     </div>
   );

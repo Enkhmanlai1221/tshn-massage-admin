@@ -1,234 +1,325 @@
 "use client";
 
-import AppointmentCreateModal from "@/components/AppointmentCreateModal";
-import AppointmentDetailDrawer from "@/components/AppointmentDetailDrawer";
-import GroupBookingModal from "@/components/GroupBookingModal";
-import { api } from "@/lib/api";
-import { STATUS_COLOR } from "@/lib/labels";
-import interactionPlugin from "@fullcalendar/interaction";
-import FullCalendar from "@fullcalendar/react";
-import resourceTimelinePlugin from "@fullcalendar/resource-timeline";
-import { useQuery } from "@tanstack/react-query";
-import { Button, Card, DatePicker, Space, Spin, Typography } from "antd";
-import dayjs from "dayjs";
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
+import {
+  App,
+  Alert,
+  Button,
+  Card,
+  DatePicker,
+  Space,
+  Segmented,
+  Spin,
+  Tag,
+  Typography,
+} from "antd";
+import { LeftOutlined, RightOutlined } from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs, { Dayjs } from "dayjs";
+import { api, apiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import LessonDrawer from "@/components/LessonDrawer";
+import WeekCalendar from "@/components/WeekCalendar";
+import LessonCreateModal, {
+  CreateTarget,
+} from "@/components/LessonCreateModal";
+import {
+  LESSON_STATUS_COLOR,
+  LESSON_STATUS_LABEL,
+  studentName,
+} from "@/lib/labels";
 
-const LICENSE =
-  process.env.NEXT_PUBLIC_FULLCALENDAR_LICENSE ||
-  "CC-Attribution-NonCommercial-NoDerivatives";
+const CELL_H = 46;
 
-const MN_LOCALE = {
-  code: "mn",
-  week: { dow: 1, doy: 4 },
-  buttonText: {
-    prev: "Өмнөх",
-    next: "Дараах",
-    today: "Өнөөдөр",
-    day: "Өдөр",
-    week: "7 хоног",
-  },
-  weekText: "7х",
-  allDayText: "Өдөржин",
-  moreLinkText: (n: number) => `+${n} нэмэлт`,
-  noEventsText: "Захиалга алга",
-};
-
-// Минут → "HH:MM:SS"
-const minToTime = (min: number) => {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
-};
-
+/**
+ * Календарын үндсэн харагдац — ӨДӨР × ӨРӨӨ.
+ * Мөр нь цаг, багана нь өрөө. Хичээлийг чирж зөөнө (HTML5 drag & drop).
+ */
 export default function CalendarPage() {
-  const calendarRef = useRef<FullCalendar>(null);
-  const [date, setDate] = useState(() => dayjs().startOf("day"));
-  // Харагдаж буй мужаар өгөгдөл татна (өдөр/7 хоног аль ч view-д зөв)
-  const [range, setRange] = useState(() => ({
-    from: dayjs().startOf("day").toISOString(),
-    to: dayjs().endOf("day").toISOString(),
-  }));
+  const { message } = App.useApp();
+  const { can } = useAuth();
+  const qc = useQueryClient();
 
-  // Захиалга үүсгэх modal (хоосон нүд дарсан ор + цаг)
-  const [newSlot, setNewSlot] = useState<{
-    bedId: string;
-    bedName: string;
-    startAt: Date;
-  } | null>(null);
-  // Дэлгэрэнгүй drawer (event дарсан)
-  const [detailId, setDetailId] = useState<string | null>(null);
-  // Бүлгээр (тур оператор) захиалах modal
-  const [groupOpen, setGroupOpen] = useState(false);
+  const [view, setView] = useState<"day" | "week">("day");
+  const [date, setDate] = useState<Dayjs>(dayjs());
+  const [openLesson, setOpenLesson] = useState<string | null>(null);
+  const [createTarget, setCreateTarget] = useState<CreateTarget | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
 
-  const { data: setting } = useQuery({
-    queryKey: ["setting"],
-    queryFn: async () => (await api.get("/setting")).data,
-  });
+  const dateKey = date.format("YYYY-MM-DD");
+  const step = view === "week" ? 7 : 1;
 
-  const { data: beds, isLoading: bedsLoading } = useQuery({
-    queryKey: ["beds-all"],
+  const { data, isLoading } = useQuery({
+    queryKey: ["calendar", "day", dateKey],
     queryFn: async () =>
-      (await api.get("/bed", { params: { limit: 500 } })).data.rows,
+      (await api.get("/calendar", { params: { date: dateKey } })).data,
+    enabled: view === "day",
   });
 
-  const { data: appointments, isLoading: apptLoading } = useQuery({
-    queryKey: ["appointments-calendar", range.from, range.to],
-    queryFn: async () =>
-      (
-        await api.get("/appointment/calendar", {
-          params: { from: range.from, to: range.to },
-        })
-      ).data.rows,
+  const move = useMutation({
+    mutationFn: async (p: { id: string; slotIndex: number; room: string }) =>
+      api.patch(`/lesson/${p.id}/move`, {
+        date: dateKey,
+        slotIndex: p.slotIndex,
+        room: p.room,
+      }),
+    onSuccess: (res) => {
+      const conflicts = res.data.conflicts || [];
+      if (conflicts.length) {
+        message.warning(
+          `Зөөлөө, гэхдээ давхцалтай: ${conflicts.map((c: any) => c.message).join("; ")}`,
+          6,
+        );
+      } else {
+        message.success(res.data.message);
+      }
+      qc.invalidateQueries({ queryKey: ["calendar"] });
+    },
+    onError: (e) => message.error(apiError(e)),
   });
 
-  const resources = useMemo(
-    () =>
-      (beds || []).map((b: any) => ({
-        id: b._id,
-        title: b.name,
-        room: b.room?.name || "Өрөө",
-      })),
-    [beds],
-  );
+  // room#slotIndex → хичээлүүд
+  const byCell = new Map<string, any[]>();
+  for (const l of data?.lessons || []) {
+    const key = `${l.room?._id ?? l.room}#${l.slotIndex}`;
+    byCell.set(key, [...(byCell.get(key) || []), l]);
+  }
 
-  const events = useMemo(
-    () =>
-      (appointments || []).map((a: any) => ({
-        id: a._id,
-        resourceId: typeof a.bed === "object" ? a.bed._id : a.bed,
-        title: `${a.customer?.firstName || ""} · ${a.serviceName || ""}`,
-        start: a.startAt,
-        end: a.endAt,
-        backgroundColor: STATUS_COLOR[a.status] || "#3b82f6",
-        borderColor: STATUS_COLOR[a.status] || "#3b82f6",
-        extendedProps: { therapist: a.therapist?.name || "" },
-      })),
-    [appointments],
-  );
-
-  const slotMin = setting ? minToTime(setting.openMinute) : "09:00:00";
-  const slotMax = setting ? minToTime(setting.closeMinute) : "22:00:00";
-  const slotDuration = setting ? minToTime(setting.slotMinutes) : "00:15:00";
+  const canWrite = can("LESSON", "isWrite");
+  const canEdit = can("LESSON", "isEdit");
 
   return (
     <div>
-      <Typography.Title level={3}>Цаг захиалгын календарь</Typography.Title>
-      <Space style={{ marginBottom: 16 }}>
-        <Typography.Text type="secondary">Огноо:</Typography.Text>
-        <DatePicker
-          value={date}
-          allowClear={false}
-          format="YYYY-MM-DD"
-          onChange={(d) =>
-            d && calendarRef.current?.getApi().gotoDate(d.toDate())
-          }
-        />
-        <Button type="primary" onClick={() => setGroupOpen(true)}>
-          Бүлгээр захиалах
-        </Button>
-      </Space>
-      <Card styles={{ body: { padding: 12 } }}>
-        {bedsLoading || apptLoading ? (
-          <Spin />
-        ) : (
-          <FullCalendar
-            ref={calendarRef}
-            schedulerLicenseKey={LICENSE}
-            plugins={[resourceTimelinePlugin, interactionPlugin]}
-            initialView="resourceTimelineDay"
-            initialDate={date.toDate()}
-            // headerToolbar={{
-            //   left: "prev,next today",
-            //   center: "title",
-            //   right: "resourceTimelineDay,resourceTimelineWeek",
-            // }}
-            locale={MN_LOCALE}
-            titleFormat={(arg) => {
-              const fmt = (m: { year: number; month: number; day: number }) =>
-                `${m.year}-${String(m.month + 1).padStart(2, "0")}-${String(
-                  m.day,
-                ).padStart(2, "0")}`;
-              if (arg.end) {
-                return `${fmt(arg.start)} — ${dayjs(arg.end.marker)
-                  .subtract(1, "day")
-                  .format("YYYY-MM-DD")}`;
-              }
-              return fmt(arg.date);
-            }}
-            slotLabelFormat={{
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }}
-            resourceGroupField="room"
-            resourceAreaHeaderContent="Ор"
-            resources={resources}
-            events={events}
-            eventContent={(arg) => {
-              const t = arg.event.extendedProps.therapist as string;
-              return (
-                <div
-                  style={{
-                    padding: "1px 4px",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    fontSize: 12,
-                    lineHeight: 1.3,
-                  }}
-                >
-                  <b>{dayjs(arg.event.start).format("HH:mm")}</b>{" "}
-                  {arg.event.title}
-                  {t ? ` · 👤${t}` : ""}
-                </div>
-              );
-            }}
-            slotMinTime={slotMin}
-            slotMaxTime={slotMax}
-            slotDuration={slotDuration}
-            nowIndicator
-            height="calc(100vh - 300px)"
-            selectable
-            dateClick={(arg) => {
-              const resource = arg.resource;
-              if (!resource) return;
-              setNewSlot({
-                bedId: resource.id,
-                bedName: resource.title,
-                startAt: arg.date,
-              });
-            }}
-            eventClick={(arg) => setDetailId(arg.event.id)}
-            datesSet={(arg) => {
-              setRange({
-                from: arg.start.toISOString(),
-                to: arg.end.toISOString(),
-              });
-              const newDate = dayjs(arg.start);
-              if (!newDate.isSame(date, "day")) setDate(newDate.startOf("day"));
-            }}
+      <Space
+        style={{
+          marginBottom: 16,
+          width: "100%",
+          justifyContent: "space-between",
+        }}
+        wrap
+      >
+        <Space wrap>
+          <Segmented
+            value={view}
+            onChange={(v) => setView(v as "day" | "week")}
+            options={[
+              { label: "Өдөр", value: "day" },
+              { label: "7 хоног", value: "week" },
+            ]}
           />
+          <Button
+            icon={<LeftOutlined />}
+            onClick={() => setDate(date.add(-step, "day"))}
+          />
+          <DatePicker
+            value={date}
+            onChange={(v) => v && setDate(v)}
+            allowClear={false}
+            format="YYYY-MM-DD"
+            picker={view === "week" ? "week" : "date"}
+          />
+          <Button
+            icon={<RightOutlined />}
+            onClick={() => setDate(date.add(step, "day"))}
+          />
+          <Button onClick={() => setDate(dayjs())}>Өнөөдөр</Button>
+        </Space>
+        {view === "day" && (
+          <Space>
+            <Typography.Text strong>
+              {dateKey} · {data?.weekdayLabel}
+            </Typography.Text>
+            {data && !data.isWorkingDay && (
+              <Tag color="red">Ажлын бус өдөр</Tag>
+            )}
+          </Space>
         )}
-      </Card>
+      </Space>
 
-      <AppointmentCreateModal
-        open={!!newSlot}
-        bedId={newSlot?.bedId || null}
-        bedName={newSlot?.bedName}
-        startAt={newSlot?.startAt || null}
-        onClose={() => setNewSlot(null)}
-      />
+      {view === "day" && data?.leaves?.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="Чөлөөтэй багш"
+          description={data.leaves
+            .map(
+              (l: any) =>
+                `${l.teacher?.name}${l.reason ? ` (${l.reason})` : ""}`,
+            )
+            .join(", ")}
+        />
+      )}
+      {view === "day" && data?.conflicts?.length > 0 && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`${data.conflicts.length} нүдэнд давхцал байна`}
+        />
+      )}
 
-      <GroupBookingModal
-        open={groupOpen}
-        defaultDate={date}
-        onClose={() => setGroupOpen(false)}
-      />
+      {view === "week" ? (
+        <WeekCalendar date={dateKey} onOpenLesson={setOpenLesson} />
+      ) : isLoading ? (
+        <Spin />
+      ) : (
+        <Card styles={{ body: { padding: 0, overflowX: "auto" } }}>
+          <table
+            style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}
+          >
+            <thead>
+              <tr>
+                <th style={th(90)}>Цаг</th>
+                {(data?.rooms || []).map((r: any) => (
+                  <th key={r._id} style={th()}>
+                    {r.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.slots || []).map((slot: any) => (
+                <tr key={slot.index}>
+                  <td style={{ ...td, ...timeCell }}>{slot.label}</td>
+                  {(data?.rooms || []).map((room: any) => {
+                    const key = `${room._id}#${slot.index}`;
+                    const items = byCell.get(key) || [];
+                    const isHover = hover === key && dragging;
+                    return (
+                      <td
+                        key={room._id}
+                        style={{
+                          ...td,
+                          background: isHover ? "#e6f4ff" : undefined,
+                          cursor:
+                            !items.length && canWrite ? "pointer" : undefined,
+                        }}
+                        onDragOver={(e) => {
+                          if (!dragging) return;
+                          e.preventDefault();
+                          setHover(key);
+                        }}
+                        onDragLeave={() => setHover(null)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setHover(null);
+                          if (dragging) {
+                            move.mutate({
+                              id: dragging,
+                              slotIndex: slot.index,
+                              room: room._id,
+                            });
+                            setDragging(null);
+                          }
+                        }}
+                        onClick={() => {
+                          if (items.length || !canWrite) return;
+                          setCreateTarget({
+                            date: dateKey,
+                            slotIndex: slot.index,
+                            room: room._id,
+                            roomName: room.name,
+                            slotLabel: slot.label,
+                          });
+                        }}
+                      >
+                        {items.map((l) => (
+                          <div
+                            key={l._id}
+                            draggable={canEdit && l.status === "SCHEDULED"}
+                            onDragStart={() => setDragging(l._id)}
+                            onDragEnd={() => {
+                              setDragging(null);
+                              setHover(null);
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenLesson(l._id);
+                            }}
+                            style={chip(l, items.length > 1)}
+                            title={`${studentName(l.student)} · ${l.teacher?.name} · ${
+                              LESSON_STATUS_LABEL[l.status]
+                            }`}
+                          >
+                            <div style={{ fontWeight: 600 }}>
+                              {studentName(l.student)}
+                              {l.type === "MAKEUP" && " ↻"}
+                            </div>
+                            <div style={{ opacity: 0.85, fontSize: 11 }}>
+                              {l.teacher?.name}
+                            </div>
+                          </div>
+                        ))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
 
-      <AppointmentDetailDrawer
-        appointmentId={detailId}
-        onClose={() => setDetailId(null)}
+      <Space style={{ marginTop: 12 }} wrap size={4}>
+        {Object.entries(LESSON_STATUS_LABEL)
+          .filter(([k]) => !["MOVED", "CANCELLED"].includes(k))
+          .map(([k, v]) => (
+            <Tag key={k} color={LESSON_STATUS_COLOR[k]}>
+              {v}
+            </Tag>
+          ))}
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          ↻ = нөхөх хичээл · товлогдсон хичээлийг чирж зөөнө
+          {view === "week" && " (7 хоногийн харагдацад өрөө сонгосон үед)"}
+        </Typography.Text>
+      </Space>
+
+      <LessonDrawer lessonId={openLesson} onClose={() => setOpenLesson(null)} />
+      <LessonCreateModal
+        target={createTarget}
+        onClose={() => setCreateTarget(null)}
       />
     </div>
   );
 }
+
+const th = (w?: number): React.CSSProperties => ({
+  border: "1px solid #f0f0f0",
+  background: "#fafafa",
+  padding: "8px 6px",
+  fontSize: 13,
+  width: w,
+  position: "sticky",
+  top: 0,
+  zIndex: 1,
+});
+
+const td: React.CSSProperties = {
+  border: "1px solid #f0f0f0",
+  padding: 3,
+  height: CELL_H,
+  verticalAlign: "top",
+};
+
+const timeCell: React.CSSProperties = {
+  fontSize: 12,
+  color: "#666",
+  whiteSpace: "nowrap",
+  textAlign: "center",
+  background: "#fafafa",
+};
+
+const chip = (l: any, conflict: boolean): React.CSSProperties => ({
+  background: LESSON_STATUS_COLOR[l.status] || "#3b82f6",
+  color: "white",
+  borderRadius: 4,
+  padding: "3px 6px",
+  fontSize: 12,
+  lineHeight: 1.25,
+  cursor: "pointer",
+  marginBottom: 2,
+  border: conflict ? "2px solid #ef4444" : undefined,
+  opacity: l.status === "SCHEDULED" ? 1 : 0.88,
+});

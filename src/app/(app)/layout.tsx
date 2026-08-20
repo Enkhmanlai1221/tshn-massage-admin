@@ -5,13 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { Layout, Menu, Spin, Dropdown, Avatar, Typography } from "antd";
 import {
   CalendarOutlined,
-  AppstoreOutlined,
-  HomeOutlined,
   TeamOutlined,
   UserOutlined,
+  HomeOutlined,
+  SoundOutlined,
+  CheckSquareOutlined,
+  CoffeeOutlined,
   DollarOutlined,
-  CarOutlined,
-  PercentageOutlined,
+  CreditCardOutlined,
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
@@ -36,52 +37,53 @@ const NAV: NavItem[] = [
   },
   {
     key: "/calendar",
-    label: "Цаг захиалга",
+    label: "Календар",
     icon: <CalendarOutlined />,
-    permission: "APPOINTMENT",
+    permission: "LESSON",
   },
   {
-    key: "/services",
-    label: "Үйлчилгээ",
-    icon: <AppstoreOutlined />,
-    permission: "SERVICE",
-  },
-  {
-    key: "/rooms",
-    label: "Өрөө / ор",
-    icon: <HomeOutlined />,
-    permission: "ROOM",
-  },
-  {
-    key: "/therapists",
-    label: "Бариач",
-    icon: <TeamOutlined />,
-    permission: "THERAPIST",
-  },
-  {
-    key: "/customers",
-    label: "Үйлчлүүлэгч",
+    key: "/students",
+    label: "Сурагч",
     icon: <UserOutlined />,
-    permission: "CUSTOMER",
+    permission: "STUDENT",
+  },
+  {
+    key: "/teachers",
+    label: "Багш",
+    icon: <TeamOutlined />,
+    permission: "TEACHER",
+  },
+  {
+    key: "/attendance",
+    label: "Ирц",
+    icon: <CheckSquareOutlined />,
+    permission: "ATTENDANCE",
+  },
+  {
+    key: "/leaves",
+    label: "Багшийн чөлөө",
+    icon: <CoffeeOutlined />,
+    permission: "LEAVE",
+  },
+  {
+    key: "/salary",
+    label: "Цалин",
+    icon: <DollarOutlined />,
+    permission: "SALARY",
   },
   {
     key: "/payments",
     label: "Төлбөр",
-    icon: <DollarOutlined />,
+    icon: <CreditCardOutlined />,
     permission: "PAYMENT",
   },
   {
-    key: "/operators",
-    label: "Тур оператор",
-    icon: <CarOutlined />,
-    permission: "TOUR_OPERATOR",
+    key: "/instruments",
+    label: "Хөгжим",
+    icon: <SoundOutlined />,
+    permission: "INSTRUMENT",
   },
-  {
-    key: "/commissions",
-    label: "Commission",
-    icon: <PercentageOutlined />,
-    permission: "TOUR_OPERATOR",
-  },
+  { key: "/rooms", label: "Өрөө", icon: <HomeOutlined />, permission: "ROOM" },
   {
     key: "/settings",
     label: "Тохиргоо",
@@ -130,7 +132,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <Layout style={{ minHeight: "100vh" }}>
       <Sider
         theme="light"
-        width={180}
+        width={200}
         style={{
           borderRight: "1px solid #f0f0f0",
           position: "sticky",
@@ -147,7 +149,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           }}
         >
           <div style={{ padding: "20px 16px", fontSize: 18, fontWeight: 700 }}>
-            Aroma SPA
+            BNM Admin
           </div>
           <Menu
             itemIcon

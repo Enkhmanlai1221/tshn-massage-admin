@@ -176,7 +176,6 @@ export default function CrudPage({
         }}
         scroll={{ x: true }}
       />
-
       <Modal
         title={editing ? "Засах" : "Шинэ"}
         open={open}
