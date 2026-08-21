@@ -9,7 +9,6 @@ import {
   Drawer,
   Form,
   Input,
-  Modal,
   Select,
   Space,
   Table,
@@ -31,7 +30,7 @@ import {
 import EnrollmentPanel from "./EnrollmentPanel";
 
 /** Багш солих — түүх хадгалагдана (хуучин бичлэг хаагдаж шинэ нээгдэнэ). */
-function ChangeTeacherModal({
+function ChangeTeacherDrawer({
   student,
   open,
   onClose,
@@ -61,14 +60,23 @@ function ChangeTeacherModal({
   });
 
   return (
-    <Modal
+    <Drawer
       title="Багш солих"
       open={open}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      confirmLoading={save.isPending}
-      okText="Солих"
-      cancelText="Болих"
+      onClose={onClose}
+      width={420}
+      footer={
+        <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button onClick={onClose}>Болих</Button>
+          <Button
+            type="primary"
+            loading={save.isPending}
+            onClick={() => form.submit()}
+          >
+            Солих
+          </Button>
+        </Space>
+      }
     >
       <Typography.Paragraph type="secondary">
         Багш солиход түүх хадгалагдана. Товлогдсон хичээлүүдийн багш
@@ -91,7 +99,7 @@ function ChangeTeacherModal({
           <Input.TextArea rows={2} placeholder="Хуваарь тохирохгүй" />
         </Form.Item>
       </Form>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -107,6 +115,14 @@ export default function StudentDrawer({
   const { data: student, isLoading } = useQuery({
     queryKey: ["student", studentId],
     queryFn: async () => (await api.get(`/student/${studentId}`)).data,
+    enabled: !!studentId,
+  });
+
+  /** Excel-ээс импортлосон, системээс өмнөх ирцийн түүх. */
+  const { data: imported } = useQuery({
+    queryKey: ["student-attendance-history", studentId],
+    queryFn: async () =>
+      (await api.get(`/student/${studentId}/attendance-history`)).data,
     enabled: !!studentId,
   });
 
@@ -241,7 +257,60 @@ export default function StudentDrawer({
             ]}
           />
 
-          <ChangeTeacherModal
+          {imported?.total > 0 && (
+            <>
+              <Divider orientation="left" plain>
+                Импортлосон ирцийн түүх
+              </Divider>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                Систем нэвтрэхээс өмнөх бүртгэл ({imported.source}). Эх файлд
+                өрөө, цаг байгаагүй тул энэ түүх календар, цалин, тасалтын
+                тоолуурт нөлөөлөхгүй.
+                {imported.firstLessonDate && (
+                  <> Анхны хичээл: <b>{imported.firstLessonDate}</b>.</>
+                )}
+              </Typography.Paragraph>
+              <Space wrap size={[4, 4]} style={{ marginBottom: 12 }}>
+                {imported.months.map((m: any) => (
+                  <Tag key={m.monthKey}>
+                    {m.monthKey} · {m.attended} ирсэн
+                    {m.absent > 0 && ` · ${m.absent} тасалсан`}
+                    {m.excused > 0 && ` · ${m.excused} чөлөө`}
+                  </Tag>
+                ))}
+              </Space>
+              <Table
+                size="small"
+                rowKey="_id"
+                dataSource={imported.rows}
+                pagination={{ pageSize: 10, showSizeChanger: false }}
+                columns={[
+                  { title: "Огноо", dataIndex: "date", width: 110 },
+                  { title: "Багш", dataIndex: ["teacher", "name"] },
+                  {
+                    title: "Төлөв",
+                    dataIndex: "status",
+                    render: (v) => <LessonStatusTag status={v} />,
+                  },
+                  {
+                    title: "Эх бичилт",
+                    dataIndex: "raw",
+                    render: (v, r: any) => (
+                      <Space size={4}>
+                        <Typography.Text type="secondary">{v}</Typography.Text>
+                        {r.isReconstructed && (
+                          <Tag color="orange">огноо сэргээсэн</Tag>
+                        )}
+                        {r.isFirstLesson && <Tag color="blue">анхны</Tag>}
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            </>
+          )}
+
+          <ChangeTeacherDrawer
             student={student}
             open={changeOpen}
             onClose={() => setChangeOpen(false)}

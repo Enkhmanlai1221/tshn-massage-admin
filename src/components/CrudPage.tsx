@@ -3,9 +3,9 @@
 import { useState } from "react";
 import {
   Button,
+  Drawer,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Space,
   Table,
@@ -28,7 +28,7 @@ export interface CrudPageProps {
   toInitialValues?: (record: any) => any;
   toPayload?: (values: any) => any;
   searchable?: boolean;
-  modalWidth?: number;
+  drawerWidth?: number;
   extraListParams?: Record<string, any>;
 }
 
@@ -42,7 +42,7 @@ export default function CrudPage({
   toInitialValues,
   toPayload,
   searchable = true,
-  modalWidth = 520,
+  drawerWidth = 520,
   extraListParams,
 }: CrudPageProps) {
   const { can } = useAuth();
@@ -91,6 +91,11 @@ export default function CrudPage({
     },
     onError: (e) => message.error(apiError(e)),
   });
+
+  const closeForm = () => {
+    setOpen(false);
+    setEditing(null);
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -176,28 +181,32 @@ export default function CrudPage({
         }}
         scroll={{ x: true }}
       />
-      <Modal
+      <Drawer
         title={editing ? "Засах" : "Шинэ"}
         open={open}
-        width={modalWidth}
-        onCancel={() => {
-          setOpen(false);
-          setEditing(null);
-        }}
-        onOk={() => form.submit()}
-        confirmLoading={saveMutation.isPending}
-        okText="Хадгалах"
-        cancelText="Болих"
+        width={drawerWidth}
+        onClose={closeForm}
+        footer={
+          <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button onClick={closeForm}>Болих</Button>
+            <Button
+              type="primary"
+              loading={saveMutation.isPending}
+              onClick={() => form.submit()}
+            >
+              Хадгалах
+            </Button>
+          </Space>
+        }
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={(values) => saveMutation.mutate(values)}
-          style={{ marginTop: 16 }}
         >
           {renderFormItems(editing)}
         </Form>
-      </Modal>
+      </Drawer>
     </div>
   );
 }

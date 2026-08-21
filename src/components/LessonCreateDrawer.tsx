@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { App, Alert, Form, Modal, Select, Typography } from "antd";
+import { App, Alert, Button, Drawer, Form, Select, Space, Typography } from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import { studentName } from "@/lib/labels";
@@ -18,7 +18,7 @@ export interface CreateTarget {
  * Календарын хоосон нүд дээр дарж хичээл нэмнэ. Өрөө/цаг нь дарсан нүднээс
  * автоматаар ирнэ — админ зөвхөн сурагчаа сонгоно.
  */
-export default function LessonCreateModal({
+export default function LessonCreateDrawer({
   target,
   onClose,
 }: {
@@ -75,14 +75,23 @@ export default function LessonCreateModal({
   const picked = (students || []).find((s: any) => s._id === student);
 
   return (
-    <Modal
+    <Drawer
       title="Хичээл нэмэх"
       open={!!target}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      confirmLoading={save.isPending}
-      okText="Товлох"
-      cancelText="Болих"
+      onClose={onClose}
+      width={460}
+      footer={
+        <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button onClick={onClose}>Болих</Button>
+          <Button
+            type="primary"
+            loading={save.isPending}
+            onClick={() => form.submit()}
+          >
+            Товлох
+          </Button>
+        </Space>
+      }
     >
       {target && (
         <>
@@ -129,6 +138,6 @@ export default function LessonCreateModal({
           )}
         </>
       )}
-    </Modal>
+    </Drawer>
   );
 }

@@ -34,7 +34,8 @@ function MakeupPicker({ lesson, onDone }: { lesson: any; onDone: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ["makeup-options", lesson._id],
     queryFn: async () =>
-      (await api.get(`/lesson/${lesson._id}/makeup-options`)).data.rows as any[],
+      (await api.get(`/lesson/${lesson._id}/makeup-options`)).data
+        .rows as any[],
   });
 
   const save = useMutation({

@@ -37,11 +37,8 @@ export default function LoginPage() {
       <Card style={{ width: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <Typography.Title level={3} style={{ marginBottom: 4 }}>
-            🎵 Хөгжмийн сургууль
+            Админ хэсэг
           </Typography.Title>
-          <Typography.Text type="secondary">
-            Админ / менежерийн хэсэг
-          </Typography.Text>
         </div>
         <Form layout="vertical" onFinish={onFinish} requiredMark={false}>
           <Form.Item
@@ -49,7 +46,10 @@ export default function LoginPage() {
             label="Имэйл"
             rules={[
               { required: true, message: "Имэйл оруулна уу" },
-              { type: "email", message: "Имэйл буруу байна (жишээ: admin@music.mn)" },
+              {
+                type: "email",
+                message: "Имэйл буруу байна (жишээ: admin@music.mn)",
+              },
             ]}
           >
             <Input prefix={<MailOutlined />} placeholder="admin@music.mn" />
@@ -71,7 +71,7 @@ export default function LoginPage() {
           </Typography.Text>
         </Divider>
         <Link href="/teacher/login">
-          <Button block>Багшийн хэсэг рүү (утсаар нэвтрэх)</Button>
+          <Button block>Багшийн хэсэг рүү</Button>
         </Link>
       </Card>
     </div>

@@ -1,7 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Button, DatePicker, Form, Input, Select, Space, Tag } from "antd";
+import {
+  Button,
+  Col,
+  DatePicker,
+  Divider,
+  Form,
+  Input,
+  Row,
+  Select,
+  Space,
+  Tag,
+} from "antd";
 import dayjs from "dayjs";
 import CrudPage from "@/components/CrudPage";
 import StudentDrawer from "@/components/StudentDrawer";
@@ -61,7 +72,7 @@ export default function StudentsPage() {
         permission="STUDENT"
         queryKey="students"
         extraListParams={filter}
-        modalWidth={620}
+        drawerWidth={620}
         columns={[
           { title: "Код", dataIndex: "code", key: "code", width: 110 },
           {
@@ -131,99 +142,118 @@ export default function StudentsPage() {
         })}
         renderFormItems={(editing) => (
           <>
-            <Space style={{ width: "100%" }} size="middle">
-              <Form.Item
-                name="lastName"
-                label="Овог"
-                style={{ width: 160 }}
-              >
-                <Input placeholder="Б" />
-              </Form.Item>
-              <Form.Item
-                name="firstName"
-                label="Нэр"
-                rules={[{ required: true, message: "Нэр оруулна уу" }]}
-                style={{ width: 240 }}
-              >
-                <Input placeholder="Ану" />
-              </Form.Item>
-            </Space>
-            <Space style={{ width: "100%" }} size="middle">
-              <Form.Item
-                name="instrument"
-                label="Хөгжим"
-                rules={[{ required: true, message: "Хөгжим сонгоно уу" }]}
-                style={{ width: 200 }}
-              >
-                <Select
-                  placeholder="Сонгох"
-                  onChange={setInstrument}
-                  options={(instruments || []).map((i: any) => ({
-                    value: i._id,
-                    label: i.name,
-                  }))}
-                />
-              </Form.Item>
-              <Form.Item
-                name="teacher"
-                label="Багш"
-                rules={[{ required: true, message: "Багш сонгоно уу" }]}
-                style={{ width: 200 }}
-                extra={editing ? "Солихдоо дэлгэрэнгүйгээс" : undefined}
-              >
-                <Select
-                  placeholder="Сонгох"
-                  disabled={!!editing}
-                  options={(teachers || []).map((t: any) => ({
-                    value: t._id,
-                    label: `${t.name} (${t.instrument?.name})`,
-                  }))}
-                />
-              </Form.Item>
-            </Space>
-            <Space style={{ width: "100%" }} size="middle">
-              <Form.Item name="level" label="Түвшин" style={{ width: 200 }}>
-                <Select options={opts(STUDENT_LEVEL_LABEL)} />
-              </Form.Item>
-              {editing && (
-                <Form.Item name="status" label="Статус" style={{ width: 200 }}>
-                  <Select options={opts(STUDENT_STATUS_LABEL)} />
+            <Divider orientation="left" plain style={{ marginTop: 0 }}>
+              Сурагч
+            </Divider>
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="lastName" label="Овог">
+                  <Input placeholder="Б" />
                 </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="firstName"
+                  label="Нэр"
+                  rules={[{ required: true, message: "Нэр оруулна уу" }]}
+                >
+                  <Input placeholder="Ану" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="birthday" label="Төрсөн өдөр">
+                  <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="gender" label="Хүйс">
+                  <Select
+                    allowClear
+                    placeholder="Сонгох"
+                    options={[
+                      { value: "MALE", label: "Эрэгтэй" },
+                      { value: "FEMALE", label: "Эмэгтэй" },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Divider orientation="left" plain>
+              Хичээл
+            </Divider>
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="instrument"
+                  label="Хөгжим"
+                  rules={[{ required: true, message: "Хөгжим сонгоно уу" }]}
+                >
+                  <Select
+                    placeholder="Сонгох"
+                    onChange={setInstrument}
+                    options={(instruments || []).map((i: any) => ({
+                      value: i._id,
+                      label: i.name,
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="teacher"
+                  label="Багш"
+                  rules={[{ required: true, message: "Багш сонгоно уу" }]}
+                  extra={editing ? "Солихдоо дэлгэрэнгүйгээс" : undefined}
+                >
+                  <Select
+                    placeholder="Сонгох"
+                    disabled={!!editing}
+                    options={(teachers || []).map((t: any) => ({
+                      value: t._id,
+                      label: `${t.name} (${t.instrument?.name})`,
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="level" label="Түвшин">
+                  <Select
+                    placeholder="Сонгох"
+                    options={opts(STUDENT_LEVEL_LABEL)}
+                  />
+                </Form.Item>
+              </Col>
+              {editing && (
+                <Col xs={24} sm={12}>
+                  <Form.Item name="status" label="Статус">
+                    <Select options={opts(STUDENT_STATUS_LABEL)} />
+                  </Form.Item>
+                </Col>
               )}
-            </Space>
-            <Space style={{ width: "100%" }} size="middle">
-              <Form.Item name="phone" label="Утас" style={{ width: 200 }}>
-                <Input placeholder="99001122" />
-              </Form.Item>
-              <Form.Item name="birthday" label="Төрсөн өдөр" style={{ width: 200 }}>
-                <DatePicker style={{ width: "100%" }} format="YYYY-MM-DD" />
-              </Form.Item>
-              <Form.Item name="gender" label="Хүйс" style={{ width: 120 }}>
-                <Select
-                  allowClear
-                  options={[
-                    { value: "MALE", label: "Эрэгтэй" },
-                    { value: "FEMALE", label: "Эмэгтэй" },
-                  ]}
-                />
-              </Form.Item>
-            </Space>
-            <Space style={{ width: "100%" }} size="middle">
-              <Form.Item
-                name="parentName"
-                label="Эцэг эхийн нэр"
-                style={{ width: 260 }}
-              >
-                <Input placeholder="Бага насны сурагчид" />
-              </Form.Item>
-              <Form.Item
-                name="parentPhone"
-                label="Эцэг эхийн утас"
-                style={{ width: 200 }}
-              >
-                <Input placeholder="88001122" />
-              </Form.Item>
-            </Space>
+            </Row>
+
+            <Divider orientation="left" plain>
+              Холбоо барих
+            </Divider>
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="phone" label="Утас">
+                  <Input placeholder="99001122" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="parentPhone" label="Эцэг эхийн утас">
+                  <Input placeholder="88001122" />
+                </Form.Item>
+              </Col>
+              <Col xs={24}>
+                <Form.Item name="parentName" label="Эцэг эхийн нэр">
+                  <Input placeholder="Бага насны сурагчид" />
+                </Form.Item>
+              </Col>
+            </Row>
+
             <Form.Item name="note" label="Тэмдэглэл">
               <Input.TextArea rows={2} />
             </Form.Item>

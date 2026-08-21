@@ -25,14 +25,8 @@ export default function TeacherLoginPage() {
     >
       <Card style={{ width: 360 }}>
         <Typography.Title level={4} style={{ textAlign: "center" }}>
-          🎵 Багшийн хэсэг
+          Багш нэвтрэх
         </Typography.Title>
-        <Typography.Paragraph
-          type="secondary"
-          style={{ textAlign: "center", marginTop: -8 }}
-        >
-          Утас + нууц үгээрээ нэвтэрнэ үү
-        </Typography.Paragraph>
         <Form
           layout="vertical"
           onFinish={async (v) => {
@@ -76,7 +70,7 @@ export default function TeacherLoginPage() {
           </Typography.Text>
         </Divider>
         <Link href="/login">
-          <Button block>Удирдлагын самбар руу (имэйлээр нэвтрэх)</Button>
+          <Button block>Удирдлагын самбар руу</Button>
         </Link>
       </Card>
     </div>

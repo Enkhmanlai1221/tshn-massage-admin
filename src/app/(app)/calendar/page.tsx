@@ -20,9 +20,9 @@ import { api, apiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import LessonDrawer from "@/components/LessonDrawer";
 import WeekCalendar from "@/components/WeekCalendar";
-import LessonCreateModal, {
+import LessonCreateDrawer, {
   CreateTarget,
-} from "@/components/LessonCreateModal";
+} from "@/components/LessonCreateDrawer";
 import {
   LESSON_STATUS_COLOR,
   LESSON_STATUS_LABEL,
@@ -277,7 +277,7 @@ export default function CalendarPage() {
       </Space>
 
       <LessonDrawer lessonId={openLesson} onClose={() => setOpenLesson(null)} />
-      <LessonCreateModal
+      <LessonCreateDrawer
         target={createTarget}
         onClose={() => setCreateTarget(null)}
       />

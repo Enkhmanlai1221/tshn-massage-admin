@@ -7,9 +7,9 @@ import {
   Button,
   Card,
   DatePicker,
+  Drawer,
   Form,
   Input,
-  Modal,
   Popconfirm,
   Select,
   Space,
@@ -31,7 +31,7 @@ import LessonDrawer from "@/components/LessonDrawer";
  * ажлын өдрийн ижил цаг руу зөөгдөнө (7 хоног хайна). Олдохгүй бол
  * "Зохицуулах шаардлагатай" таб дээр гарч ирнэ.
  */
-function LeaveModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function LeaveDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm();
@@ -62,14 +62,23 @@ function LeaveModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   });
 
   return (
-    <Modal
+    <Drawer
       title="Багшийн чөлөө бүртгэх"
       open={open}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      confirmLoading={save.isPending}
-      okText="Бүртгэх"
-      cancelText="Болих"
+      onClose={onClose}
+      width={460}
+      footer={
+        <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button onClick={onClose}>Болих</Button>
+          <Button
+            type="primary"
+            loading={save.isPending}
+            onClick={() => form.submit()}
+          >
+            Бүртгэх
+          </Button>
+        </Space>
+      }
     >
       <Alert
         type="info"
@@ -103,7 +112,7 @@ function LeaveModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Input.TextArea rows={2} placeholder="Өвчтэй" />
         </Form.Item>
       </Form>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -276,7 +285,7 @@ export default function LeavesPage() {
         ]}
       />
 
-      <LeaveModal open={open} onClose={() => setOpen(false)} />
+      <LeaveDrawer open={open} onClose={() => setOpen(false)} />
       <LessonDrawer lessonId={lesson} onClose={() => setLesson(null)} />
     </div>
   );

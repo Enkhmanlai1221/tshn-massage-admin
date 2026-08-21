@@ -4,10 +4,10 @@ import { useState } from "react";
 import {
   App,
   Button,
+  Drawer,
   Form,
   Input,
   InputNumber,
-  Modal,
   Select,
   Switch,
   Tag,
@@ -22,7 +22,7 @@ import { useInstruments } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
 
 /** Багшийн нууц үг тавих / шинэчлэх. Багш өөрөө бүртгүүлдэггүй. */
-function PasswordModal({
+function PasswordDrawer({
   teacher,
   onClose,
 }: {
@@ -46,14 +46,23 @@ function PasswordModal({
   });
 
   return (
-    <Modal
+    <Drawer
       title={teacher ? `${teacher.name} — нууц үг` : ""}
       open={!!teacher}
-      onCancel={onClose}
-      onOk={() => form.submit()}
-      confirmLoading={save.isPending}
-      okText="Хадгалах"
-      cancelText="Болих"
+      onClose={onClose}
+      width={420}
+      footer={
+        <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+          <Button onClick={onClose}>Болих</Button>
+          <Button
+            type="primary"
+            loading={save.isPending}
+            onClick={() => form.submit()}
+          >
+            Хадгалах
+          </Button>
+        </Space>
+      }
     >
       <Typography.Paragraph type="secondary">
         Нууц үг тавихад багшийн нэвтрэх эрх автоматаар нээгдэнэ. Багш өөрөө
@@ -68,7 +77,7 @@ function PasswordModal({
           <Input.Password placeholder="Хамгийн багадаа 6 тэмдэгт" />
         </Form.Item>
       </Form>
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -204,7 +213,7 @@ export default function TeachersPage() {
           </>
         )}
       />
-      <PasswordModal teacher={pwTeacher} onClose={() => setPwTeacher(null)} />
+      <PasswordDrawer teacher={pwTeacher} onClose={() => setPwTeacher(null)} />
     </>
   );
 }

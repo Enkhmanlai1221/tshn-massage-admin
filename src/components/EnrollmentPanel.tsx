@@ -6,9 +6,9 @@ import {
   Alert,
   Button,
   Card,
+  Drawer,
   Empty,
   Form,
-  Modal,
   Popconfirm,
   Select,
   Space,
@@ -188,15 +188,23 @@ export default function EnrollmentPanel({ student }: { student: any }) {
         )}
       </Card>
 
-      <Modal
+      <Drawer
         title="Тогтмол хуваарь үүсгэх"
         open={open}
-        onCancel={() => setOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={create.isPending}
-        okText="Үүсгэх"
-        cancelText="Болих"
+        onClose={() => setOpen(false)}
         width={560}
+        footer={
+          <Space style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button onClick={() => setOpen(false)}>Болих</Button>
+            <Button
+              type="primary"
+              loading={create.isPending}
+              onClick={() => form.submit()}
+            >
+              Үүсгэх
+            </Button>
+          </Space>
+        }
       >
         <Alert
           type="info"
@@ -257,7 +265,7 @@ export default function EnrollmentPanel({ student }: { student: any }) {
             )}
           </Form.List>
         </Form>
-      </Modal>
+      </Drawer>
     </>
   );
 }

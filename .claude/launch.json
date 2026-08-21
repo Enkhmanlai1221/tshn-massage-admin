@@ -4,7 +4,7 @@
     {
       "name": "music-admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--", "--port", "3001"],
       "port": 3001
     }
   ]
