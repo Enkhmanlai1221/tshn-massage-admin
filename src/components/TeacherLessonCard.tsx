@@ -1,18 +1,22 @@
 "use client";
 
-import { App, Button, Space, Tag, Typography } from "antd";
+import { useState } from "react";
+import { App, Button, Tag, Tooltip, Typography } from "antd";
 import {
   PhoneOutlined,
   ClockCircleOutlined,
   HomeOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { teacherApi, teacherApiError } from "@/lib/teacher-api";
 import {
   LESSON_STATUS_COLOR,
   LESSON_STATUS_LABEL,
+  minuteLabel,
   studentName,
 } from "@/lib/labels";
+import ShiftLessonModal from "./ShiftLessonModal";
 
 const OPTIONS = ["ATTENDED", "ABSENT", "EXCUSED"] as const;
 
@@ -32,6 +36,7 @@ export default function TeacherLessonCard({
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const [shiftOpen, setShiftOpen] = useState(false);
 
   const mark = useMutation({
     mutationFn: async (status: string) =>
@@ -52,6 +57,8 @@ export default function TeacherLessonCard({
   });
 
   const marked = ["ATTENDED", "ABSENT", "EXCUSED"].includes(lesson.status);
+  const lastMove = lesson.moveHistory?.[lesson.moveHistory.length - 1];
+  const [start, end] = String(lesson.timeLabel ?? "").split("–");
   const phone = lesson.student?.phone || lesson.student?.parentPhone;
 
   const lockedReason = lesson.salaryPayout
@@ -64,38 +71,54 @@ export default function TeacherLessonCard({
     <div className={`lesson-card${marked ? " lesson-card--done" : ""}`}>
       {/* Мөр 1: цаг + сурагч + төлөв */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <div style={{ flexShrink: 0, textAlign: "center", minWidth: 54 }}>
+        <div style={{ flexShrink: 0, textAlign: "center", minWidth: 48 }}>
           <div style={{ fontSize: 17, fontWeight: 700, lineHeight: 1.15 }}>
-            {lesson.timeLabel?.split("–")[0]}
+            {start}
           </div>
-          <div style={{ fontSize: 11, color: "#999" }}>
-            {lesson.timeLabel?.split("–")[1]}
+          <div style={{ fontSize: 11, color: "#aaa", lineHeight: 1.3 }}>
+            {end && `–${end}`}
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.25 }}>
-            {studentName(lesson.student)}
+          {/* Нэр + шошго — нэрийг 2 мөр хүртэл таслана. */}
+          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+            <span className="lesson-card__name">
+              {studentName(lesson.student)}
+            </span>
             {lesson.type === "MAKEUP" && (
-              <Tag color="gold" style={{ marginLeft: 6, fontSize: 10 }}>
+              <Tag color="gold" className="lesson-card__chip">
                 нөхөх
               </Tag>
             )}
+            {lastMove && (
+              <Tooltip
+                title={`${minuteLabel(lastMove.startMinute)}–${minuteLabel(
+                  lastMove.endMinute,
+                )} цагаас зөөсөн${lastMove.reason ? ` · ${lastMove.reason}` : ""}`}
+              >
+                <Tag color="purple" className="lesson-card__chip">
+                  <SwapOutlined /> зөөсөн
+                </Tag>
+              </Tooltip>
+            )}
           </div>
-          <Space size={10} wrap style={{ marginTop: 3, fontSize: 12, color: "#888" }}>
+
+          {/* Өрөө + утас — ҮРГЭЛЖ нэг мөр. Урт өрөөний нэр таслагдана. */}
+          <div className="lesson-card__meta">
             {showDate && (
-              <span>
-                <ClockCircleOutlined /> {lesson.date} {lesson.weekdayLabel}
+              <span style={{ flexShrink: 0 }}>
+                <ClockCircleOutlined /> {lesson.date}
               </span>
             )}
-            <span>
+            <span className="lesson-card__room">
               <HomeOutlined /> {lesson.room?.name}
             </span>
             {phone && (
-              <a href={`tel:${phone}`} style={{ fontWeight: 500 }}>
+              <a href={`tel:${phone}`} className="lesson-card__phone">
                 <PhoneOutlined /> {phone}
               </a>
             )}
-          </Space>
+          </div>
         </div>
         <Tag
           color={LESSON_STATUS_COLOR[lesson.status]}
@@ -140,6 +163,26 @@ export default function TeacherLessonCard({
           </Typography.Text>
         )}
       </div>
+
+      {/* Сурагч хоцорсон / эрт ирсэн үед мөн өдрийн сул цаг руу зөөнө. */}
+      {lesson.shiftable && (
+        <Button
+          block
+          className="touch-btn"
+          icon={<SwapOutlined />}
+          onClick={() => setShiftOpen(true)}
+          style={{ marginTop: 6 }}
+        >
+          Цаг зөөх
+        </Button>
+      )}
+
+      <ShiftLessonModal
+        lesson={lesson}
+        mode="teacher"
+        open={shiftOpen}
+        onClose={() => setShiftOpen(false)}
+      />
     </div>
   );
 }

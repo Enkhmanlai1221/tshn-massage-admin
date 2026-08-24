@@ -21,6 +21,23 @@ export const LESSON_STATUS_COLOR: Record<string, string> = {
   CANCELLED: "#71717a",
 };
 
+/**
+ * Календарын нүднүүдэд зориулсан зөөлөн өнгө — товлогдсон (ирээгүй) хичээл
+ * бодитоор болсон хичээлтэй ижил түвшний "тод" харагдвал андуурна.
+ */
+export const LESSON_STATUS_SOFT: Record<
+  string,
+  { bg: string; border: string; text: string }
+> = {
+  SCHEDULED: { bg: "#e6f4ff", border: "#91caff", text: "#1554ad" },
+  ATTENDED: { bg: "#f6ffed", border: "#b7eb8f", text: "#237804" },
+  ABSENT: { bg: "#fff1f0", border: "#ffa39e", text: "#a8071a" },
+  EXCUSED: { bg: "#fff7e6", border: "#ffd591", text: "#ad6800" },
+  TEACHER_LEAVE: { bg: "#f9f0ff", border: "#d3adf7", text: "#6d24b3" },
+  MOVED: { bg: "#fafafa", border: "#d9d9d9", text: "#595959" },
+  CANCELLED: { bg: "#fafafa", border: "#d9d9d9", text: "#8c8c8c" },
+};
+
 export const LESSON_TYPE_LABEL: Record<string, string> = {
   REGULAR: "Ердийн",
   MAKEUP: "Нөхөх",
@@ -67,7 +84,15 @@ export const ENROLLMENT_STATUS_LABEL: Record<string, string> = {
 };
 
 /** 0=Ням ... 6=Бямба */
-export const WEEKDAY_LABEL = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"];
+export const WEEKDAY_LABEL = [
+  "Ням",
+  "Даваа",
+  "Мягмар",
+  "Лхагва",
+  "Пүрэв",
+  "Баасан",
+  "Бямба",
+];
 export const WEEKDAY_SHORT = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"];
 
 export const money = (n?: number | null) =>

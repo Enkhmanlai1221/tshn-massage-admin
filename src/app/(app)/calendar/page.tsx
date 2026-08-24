@@ -24,8 +24,8 @@ import LessonCreateDrawer, {
   CreateTarget,
 } from "@/components/LessonCreateDrawer";
 import {
-  LESSON_STATUS_COLOR,
   LESSON_STATUS_LABEL,
+  LESSON_STATUS_SOFT,
   studentName,
 } from "@/lib/labels";
 
@@ -265,11 +265,21 @@ export default function CalendarPage() {
       <Space style={{ marginTop: 12 }} wrap size={4}>
         {Object.entries(LESSON_STATUS_LABEL)
           .filter(([k]) => !["MOVED", "CANCELLED"].includes(k))
-          .map(([k, v]) => (
-            <Tag key={k} color={LESSON_STATUS_COLOR[k]}>
-              {v}
-            </Tag>
-          ))}
+          .map(([k, v]) => {
+            const soft = LESSON_STATUS_SOFT[k];
+            return (
+              <Tag
+                key={k}
+                style={{
+                  background: soft.bg,
+                  borderColor: soft.border,
+                  color: soft.text,
+                }}
+              >
+                {v}
+              </Tag>
+            );
+          })}
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           ↻ = нөхөх хичээл · товлогдсон хичээлийг чирж зөөнө
           {view === "week" && " (7 хоногийн харагдацад өрөө сонгосон үед)"}
@@ -311,15 +321,17 @@ const timeCell: React.CSSProperties = {
   background: "#fafafa",
 };
 
-const chip = (l: any, conflict: boolean): React.CSSProperties => ({
-  background: LESSON_STATUS_COLOR[l.status] || "#3b82f6",
-  color: "white",
-  borderRadius: 4,
-  padding: "3px 6px",
-  fontSize: 12,
-  lineHeight: 1.25,
-  cursor: "pointer",
-  marginBottom: 2,
-  border: conflict ? "2px solid #ef4444" : undefined,
-  opacity: l.status === "SCHEDULED" ? 1 : 0.88,
-});
+const chip = (l: any, conflict: boolean): React.CSSProperties => {
+  const soft = LESSON_STATUS_SOFT[l.status] || LESSON_STATUS_SOFT.SCHEDULED;
+  return {
+    background: soft.bg,
+    color: soft.text,
+    borderRadius: 4,
+    padding: "3px 6px",
+    fontSize: 12,
+    lineHeight: 1.25,
+    cursor: "pointer",
+    marginBottom: 2,
+    border: conflict ? "1.5px solid #ef4444" : `1px solid ${soft.border}`,
+  };
+};

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useTeachers } from "@/lib/hooks";
-import { LESSON_STATUS_COLOR, LESSON_STATUS_LABEL, studentName } from "@/lib/labels";
+import { LESSON_STATUS_LABEL, LESSON_STATUS_SOFT, studentName } from "@/lib/labels";
 
 /**
  * 7 ХОНОГИЙН ХАРАГДАЦ — ЦАГ × ГАРАГ.
@@ -278,14 +278,17 @@ const timeCell: React.CSSProperties = {
   background: "#fafafa",
 };
 
-const chip = (l: any, conflict: boolean): React.CSSProperties => ({
-  background: LESSON_STATUS_COLOR[l.status] || "#3b82f6",
-  color: "white",
-  borderRadius: 3,
-  padding: "2px 4px",
-  fontSize: 11,
-  lineHeight: 1.2,
-  cursor: "pointer",
-  marginBottom: 2,
-  border: conflict ? "2px solid #ef4444" : undefined,
-});
+const chip = (l: any, conflict: boolean): React.CSSProperties => {
+  const soft = LESSON_STATUS_SOFT[l.status] || LESSON_STATUS_SOFT.SCHEDULED;
+  return {
+    background: soft.bg,
+    color: soft.text,
+    borderRadius: 3,
+    padding: "2px 4px",
+    fontSize: 11,
+    lineHeight: 1.2,
+    cursor: "pointer",
+    marginBottom: 2,
+    border: conflict ? "1.5px solid #ef4444" : `1px solid ${soft.border}`,
+  };
+};

@@ -23,7 +23,7 @@ export default function TeacherLoginPage() {
         padding: 16,
       }}
     >
-      <Card style={{ width: 360 }}>
+      <Card style={{ width: "100%", maxWidth: 360 }}>
         <Typography.Title level={4} style={{ textAlign: "center" }}>
           Багш нэвтрэх
         </Typography.Title>
@@ -45,16 +45,33 @@ export default function TeacherLoginPage() {
             label="Утас"
             rules={[{ required: true, message: "Утсаа оруулна уу" }]}
           >
-            <Input prefix={<PhoneOutlined />} placeholder="99110011" />
+            <Input
+              size="large"
+              inputMode="numeric"
+              autoComplete="tel"
+              prefix={<PhoneOutlined />}
+              placeholder="99110011"
+            />
           </Form.Item>
           <Form.Item
             name="password"
             label="Нууц үг"
             rules={[{ required: true, message: "Нууц үгээ оруулна уу" }]}
           >
-            <Input.Password prefix={<LockOutlined />} placeholder="••••••••" />
+            <Input.Password
+              size="large"
+              autoComplete="current-password"
+              prefix={<LockOutlined />}
+              placeholder="••••••••"
+            />
           </Form.Item>
-          <Button type="primary" htmlType="submit" block loading={loading}>
+          <Button
+            type="primary"
+            htmlType="submit"
+            block
+            className="touch-btn"
+            loading={loading}
+          >
             Нэвтрэх
           </Button>
         </Form>
@@ -70,7 +87,7 @@ export default function TeacherLoginPage() {
           </Typography.Text>
         </Divider>
         <Link href="/login">
-          <Button block>Удирдлагын самбар руу</Button>
+          <Button block className="touch-btn">Удирдлагын самбар руу</Button>
         </Link>
       </Card>
     </div>

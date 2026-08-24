@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import { teacherApi } from "@/lib/teacher-api";
 import TeacherLessonCard from "@/components/TeacherLessonCard";
+import { WEEKDAY_LABEL } from "@/lib/labels";
 
 /** Багшийн үндсэн дэлгэц — тухайн өдрийн хичээл, ирцийг шууд бүртгэнэ. */
 export default function TeacherTodayPage() {
@@ -17,8 +18,11 @@ export default function TeacherTodayPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["teacher-schedule", dateKey],
     queryFn: async () =>
-      (await teacherApi.get("/schedule", { params: { from: dateKey, to: dateKey } }))
-        .data,
+      (
+        await teacherApi.get("/schedule", {
+          params: { from: dateKey, to: dateKey },
+        })
+      ).data,
   });
 
   const rows = data?.rows || [];
@@ -49,8 +53,7 @@ export default function TeacherTodayPage() {
         />
         <div style={{ flex: 1, textAlign: "center" }}>
           <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>
-            {date.format("MM сарын DD")}
-            {rows[0]?.weekdayLabel ? ` · ${rows[0].weekdayLabel}` : ""}
+            {date.format("MM сарын DD")} · {WEEKDAY_LABEL[date.day()]}
           </div>
           {!isToday && (
             <a style={{ fontSize: 12 }} onClick={() => setDate(dayjs())}>
@@ -74,7 +77,11 @@ export default function TeacherTodayPage() {
         {[
           { label: "Хичээл", value: rows.length, color: "#262626" },
           { label: "Бүртгэсэн", value: marked, color: "#22c55e" },
-          { label: "Үлдсэн", value: pending, color: pending ? "#f59e0b" : "#bfbfbf" },
+          {
+            label: "Үлдсэн",
+            value: pending,
+            color: pending ? "#f59e0b" : "#bfbfbf",
+          },
         ].map((s) => (
           <div
             key={s.label}
@@ -87,7 +94,14 @@ export default function TeacherTodayPage() {
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1.1 }}>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: s.color,
+                lineHeight: 1.1,
+              }}
+            >
               {s.value}
             </div>
             <div style={{ fontSize: 11, color: "#999" }}>{s.label}</div>

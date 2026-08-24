@@ -10,9 +10,11 @@ import {
   Select,
   Space,
   Tag,
+  Timeline,
   Typography,
   Divider,
 } from "antd";
+import { SwapOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import {
@@ -25,6 +27,7 @@ import {
 } from "@/lib/labels";
 import { useAuth } from "@/lib/auth";
 import AttendanceButtons from "./AttendanceButtons";
+import ShiftLessonModal from "./ShiftLessonModal";
 
 /** Нөхөх хичээл товлох — backend-ийн санал болгосон сул цагуудаас сонгоно. */
 function MakeupPicker({ lesson, onDone }: { lesson: any; onDone: () => void }) {
@@ -95,6 +98,7 @@ export default function LessonDrawer({
   const { message } = App.useApp();
   const { can } = useAuth();
   const qc = useQueryClient();
+  const [shiftOpen, setShiftOpen] = useState(false);
 
   const { data: lesson, isLoading } = useQuery({
     queryKey: ["lesson", lessonId],
@@ -120,6 +124,14 @@ export default function LessonDrawer({
 
   const canMakeup =
     lesson && ["EXCUSED", "TEACHER_LEAVE"].includes(lesson.status);
+
+  // Мөн өдрийн дотор урагш/хойш зөөх — сурагч хоцорсон үеийн түгээмэл кейс.
+  const canShift =
+    lesson &&
+    lesson.status === "SCHEDULED" &&
+    !lesson.salaryPayout &&
+    can("LESSON", "isEdit");
+  const moves = lesson?.moveHistory || [];
 
   return (
     <Drawer
@@ -190,6 +202,69 @@ export default function LessonDrawer({
               </Descriptions.Item>
             )}
           </Descriptions>
+
+          {moves.length > 0 && (
+            <>
+              <Divider orientation="left" plain>
+                Зөөлтийн түүх
+              </Divider>
+              <Timeline
+                items={[
+                  ...moves.map((m: any) => ({
+                    color: "gray",
+                    children: (
+                      <div style={{ fontSize: 12 }}>
+                        <b>
+                          {m.date} {minuteLabel(m.startMinute)}–
+                          {minuteLabel(m.endMinute)}
+                        </b>{" "}
+                        · {m.room?.name}
+                        <div style={{ color: "#999" }}>
+                          {m.reason || "шалтгаан бичээгүй"} —{" "}
+                          {m.byModel === "Teacher" ? "багш" : "админ"}
+                          {m.by?.name ? ` (${m.by.name})` : ""}
+                        </div>
+                      </div>
+                    ),
+                  })),
+                  {
+                    color: "blue",
+                    children: (
+                      <div style={{ fontSize: 12 }}>
+                        <b>
+                          {lesson.date} {minuteLabel(lesson.startMinute)}–
+                          {minuteLabel(lesson.endMinute)}
+                        </b>{" "}
+                        · {lesson.room?.name}
+                        <div style={{ color: "#999" }}>одоогийн цаг</div>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </>
+          )}
+
+          {canShift && (
+            <>
+              <Divider orientation="left" plain>
+                Цаг зөөх
+              </Divider>
+              <Button
+                block
+                icon={<SwapOutlined />}
+                onClick={() => setShiftOpen(true)}
+              >
+                Мөн өдрийн сул цаг руу зөөх
+              </Button>
+              <ShiftLessonModal
+                lesson={lesson}
+                mode="admin"
+                open={shiftOpen}
+                onClose={() => setShiftOpen(false)}
+              />
+            </>
+          )}
 
           {can("ATTENDANCE", "isWrite") && !lesson.salaryPayout && (
             <>

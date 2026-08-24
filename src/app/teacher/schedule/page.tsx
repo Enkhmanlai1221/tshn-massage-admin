@@ -20,10 +20,11 @@ export default function TeacherSchedulePage() {
   const [range, setRange] = useState<Range>("week");
   const [anchor, setAnchor] = useState<Dayjs>(dayjs());
 
-  const from =
-    range === "week"
-      ? anchor.startOf("week").add(1, "day")
-      : anchor.startOf("month");
+  // Даваагаас эхэлсэн 7 хоног. dayjs-ийн startOf("week") нь Ням гараг тул
+  // шууд ашиглавал НЯМ гарагт дараагийн долоо хоног харагдаж, өнөөдөр
+  // мужаас гарч унана. Тиймээс Давааг гараас нь тооцно.
+  const monday = anchor.add(anchor.day() === 0 ? -6 : 1 - anchor.day(), "day");
+  const from = range === "week" ? monday.startOf("day") : anchor.startOf("month");
   const to = range === "week" ? from.add(6, "day") : anchor.endOf("month");
 
   const { data, isLoading } = useQuery({
