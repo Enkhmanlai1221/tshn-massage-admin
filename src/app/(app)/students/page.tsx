@@ -103,6 +103,20 @@ export default function StudentsPage() {
             render: (_, r: any) => r.phone || r.parentPhone || "—",
           },
           {
+            title: "Энэ сар",
+            key: "month",
+            width: 110,
+            render: (_, r: any) => {
+              const m = r.month;
+              if (!m) return "—";
+              return (
+                <Tag color={m.attended >= m.quota ? "green" : "default"}>
+                  {m.attended}/{m.quota} оролт
+                </Tag>
+              );
+            },
+          },
+          {
             title: "Төлбөр",
             dataIndex: "lastPaidMonth",
             key: "lastPaidMonth",
@@ -238,7 +252,11 @@ export default function StudentsPage() {
             </Divider>
             <Row gutter={16}>
               <Col xs={24} sm={12}>
-                <Form.Item name="phone" label="Утас">
+                <Form.Item
+                  name="phone"
+                  label="Утас"
+                  rules={[{ required: true, message: "Утас оруулна уу" }]}
+                >
                   <Input placeholder="99001122" />
                 </Form.Item>
               </Col>
