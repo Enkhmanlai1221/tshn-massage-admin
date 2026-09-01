@@ -58,7 +58,11 @@ export default function AttendanceButtons({
         return (
           <Tooltip
             key={status}
-            title={active ? "Одоогийн төлөв" : `${LESSON_STATUS_LABEL[status]} болгох`}
+            title={
+              active
+                ? "Одоогийн төлөв"
+                : `${LESSON_STATUS_LABEL[status]} болгох`
+            }
           >
             <Button
               size={size}

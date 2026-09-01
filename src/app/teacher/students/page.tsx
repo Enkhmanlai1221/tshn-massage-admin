@@ -13,6 +13,7 @@ import {
   Progress,
   Radio,
   Select,
+  Popconfirm,
   Skeleton,
   Space,
   Spin,
@@ -107,8 +108,7 @@ function SlotRow({
   );
   const weekdays = [...new Set(free.map((a) => a.weekday))].sort();
   const times = free.filter((a) => a.weekday === value.weekday);
-  const rooms =
-    times.find((a) => a.slotIndex === value.slotIndex)?.rooms ?? [];
+  const rooms = times.find((a) => a.slotIndex === value.slotIndex)?.rooms ?? [];
 
   return (
     <div
@@ -139,7 +139,9 @@ function SlotRow({
           disabled={value.weekday === undefined}
           options={times.map((t) => ({
             value: t.slotIndex,
-            label: (t as any).label?.split(" ").slice(1).join(" ") || `#${t.slotIndex}`,
+            label:
+              (t as any).label?.split(" ").slice(1).join(" ") ||
+              `#${t.slotIndex}`,
           }))}
           onChange={(slotIndex) =>
             onChange({ weekday: value.weekday, slotIndex })
@@ -259,15 +261,15 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
         description={`Сурагч танд автоматаар оногдоно. Долоо хоногт ${weekly} удаа, сард ${quota} оролт.`}
       />
       <Form form={form} layout="vertical" onFinish={submit}>
+        <Form.Item name="lastName" label="Овог">
+          <Input size="large" placeholder="Б" />
+        </Form.Item>
         <Form.Item
           name="firstName"
           label="Нэр"
           rules={[{ required: true, message: "Нэр оруулна уу" }]}
         >
           <Input size="large" placeholder="Ану" />
-        </Form.Item>
-        <Form.Item name="lastName" label="Овог">
-          <Input size="large" placeholder="Б" />
         </Form.Item>
         <Form.Item
           name="phone"
@@ -285,7 +287,10 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Input size="large" inputMode="numeric" placeholder="99001122" />
         </Form.Item>
 
-        <Typography.Text strong style={{ display: "block", margin: "6px 0 8px" }}>
+        <Typography.Text
+          strong
+          style={{ display: "block", margin: "6px 0 8px" }}
+        >
           Долоо хоногийн хуваарь ({weekly} удаа)
         </Typography.Text>
         {isLoading ? (
@@ -330,14 +335,21 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
         <Form.Item name="level" label="Түвшин" initialValue="BEGINNER">
           <Select
             size="large"
-            options={Object.entries(STUDENT_LEVEL_LABEL).map(([value, label]) => ({
-              value,
-              label,
-            }))}
+            options={Object.entries(STUDENT_LEVEL_LABEL).map(
+              ([value, label]) => ({
+                value,
+                label,
+              }),
+            )}
           />
         </Form.Item>
         <Form.Item name="birthday" label="Төрсөн өдөр">
-          <DatePicker size="large" style={{ width: "100%" }} format="YYYY-MM-DD" inputReadOnly />
+          <DatePicker
+            size="large"
+            style={{ width: "100%" }}
+            format="YYYY-MM-DD"
+            inputReadOnly
+          />
         </Form.Item>
         <Form.Item name="parentName" label="Эцэг эхийн нэр">
           <Input size="large" placeholder="Бага насны сурагчид" />
@@ -350,6 +362,99 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
         </Form.Item>
       </Form>
     </Drawer>
+  );
+}
+
+/**
+ * НЭМЭЛТ ХИЧЭЭЛ ТОВЛОХ — «энэ долоо хоногт 3-4 удаа орно» гэж тохирсон үед.
+ *
+ * Үндсэн хуваарь долоо хоногт 2 хэвээр. Энэ хэсэг нь тухайн өдрийн СУЛ цагийг
+ * л харуулна (багш, сурагч, өрөө гурвуулаа сул), тиймээс давхцал үүсэхгүй.
+ */
+function BookLesson({ studentId }: { studentId: string }) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const [day, setDay] = useState(dayjs().add(1, "day"));
+
+  const dateKey = day.format("YYYY-MM-DD");
+  const { data, isFetching } = useQuery({
+    queryKey: ["teacher-free-slots", studentId, dateKey],
+    queryFn: async () =>
+      (
+        await teacherApi.get(`/student/${studentId}/free-slots`, {
+          params: { date: dateKey },
+        })
+      ).data as { rows: any[]; count: number },
+  });
+
+  const book = useMutation({
+    mutationFn: async (slot: any) =>
+      teacherApi.post(`/student/${studentId}/lesson`, {
+        date: dateKey,
+        slotIndex: slot.slotIndex,
+        room: slot.rooms[0]._id,
+      }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      qc.invalidateQueries({ queryKey: ["teacher-student", studentId] });
+      qc.invalidateQueries({ queryKey: ["teacher-free-slots", studentId] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      <Typography.Text strong style={{ fontSize: 13 }}>
+        Нэмэлт хичээл товлох
+      </Typography.Text>
+      <Typography.Paragraph
+        type="secondary"
+        style={{ fontSize: 12, margin: "2px 0 0" }}
+      >
+        Тасалсанаа нөхөх, эсвэл тохиролцоод нэмж орох үед.
+      </Typography.Paragraph>
+      <DatePicker
+        size="large"
+        style={{ width: "100%", marginTop: 8 }}
+        value={day}
+        onChange={(v) => v && setDay(v)}
+        format="YYYY-MM-DD"
+        inputReadOnly
+        disabledDate={(d) => d.isBefore(dayjs(), "day")}
+      />
+      {isFetching ? (
+        <Skeleton active paragraph={{ rows: 1 }} style={{ marginTop: 10 }} />
+      ) : !data?.rows?.length ? (
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 12, display: "block", marginTop: 8 }}
+        >
+          Тэр өдөр сул цаг алга. Өөр өдөр сонгоно уу.
+        </Typography.Text>
+      ) : (
+        <Space size={[6, 6]} wrap style={{ marginTop: 10 }}>
+          {data.rows.map((r: any) => (
+            <Button
+              key={r.slotIndex}
+              size="small"
+              loading={book.isPending}
+              onClick={() => book.mutate(r)}
+            >
+              {r.timeLabel} · {r.rooms[0].name}
+            </Button>
+          ))}
+        </Space>
+      )}
+    </div>
   );
 }
 
@@ -387,6 +492,19 @@ function StudentSheet({
     onSuccess: (res) => {
       message.success(res.data.message);
       qc.invalidateQueries({ queryKey: ["teacher-student", id] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  const cancel = useMutation({
+    mutationFn: async (lessonId: string) =>
+      teacherApi.delete(`/student/${id}/lesson/${lessonId}`),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      qc.invalidateQueries({ queryKey: ["teacher-student", id] });
+      qc.invalidateQueries({ queryKey: ["teacher-free-slots", id] });
       qc.invalidateQueries({ queryKey: ["teacher-students"] });
       qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
     },
@@ -438,7 +556,9 @@ function StudentSheet({
             <Progress
               percent={Math.min(100, Math.round((p.attended / p.quota) * 100))}
               showInfo={false}
-              strokeColor={p.attended >= p.quota ? "#22c55e" : "#7c3aed"}
+              strokeColor={
+                p.over ? "#f59e0b" : p.filled ? "#22c55e" : "#7c3aed"
+              }
             />
             <Space size={6} wrap style={{ fontSize: 12 }}>
               <Tag color="red">Тасалсан {p.absent}</Tag>
@@ -446,6 +566,26 @@ function StudentSheet({
               <Tag color="blue">Товлогдсон {p.scheduled}</Tag>
             </Space>
           </div>
+
+          {/* Норм дүүрсэн эсэх. Хурдац чөлөөтэй — эхний 7 хоногтоо 7 оролт
+              хийсэн ч болно, зөвхөн сарын нийлбэр л чухал. */}
+          {(p.filled || p.over > 0) && (
+            <Alert
+              type={p.over > 0 ? "warning" : "success"}
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={
+                p.over > 0
+                  ? `Нормоос ${p.over} оролт илүү (${p.attended}/${p.quota})`
+                  : `Сарын ${p.quota} оролт дүүрсэн`
+              }
+              description={
+                p.scheduled > 0
+                  ? `Энэ сард товлогдсон ${p.scheduled} хичээл үлдсэн байна. Орохгүй бол админд хэлж цуцлуулна уу — эс тэгвээс тасалсанд тооцогдоно.`
+                  : undefined
+              }
+            />
+          )}
 
           {!!data.schedule?.length && (
             <div style={{ marginBottom: 12 }}>
@@ -491,6 +631,54 @@ function StudentSheet({
               <Radio.Button value="EXCUSED">Чөлөөтэй</Radio.Button>
             </Radio.Group>
           </div>
+
+          <BookLesson studentId={id!} />
+
+          {!!data.upcoming?.length && (
+            <div style={{ marginBottom: 12 }}>
+              <Typography.Text strong style={{ fontSize: 13 }}>
+                Товлогдсон хичээл ({data.upcoming.length})
+              </Typography.Text>
+              {data.upcoming.map((l: any) => (
+                <div
+                  key={l._id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 0",
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14 }}>
+                      {l.date} · {l.weekdayLabel}
+                      {l.type !== "REGULAR" && (
+                        <Tag color="purple" style={{ marginLeft: 6 }}>
+                          {l.typeLabel}
+                        </Tag>
+                      )}
+                    </div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {l.timeLabel} · {l.room?.name ?? "—"}
+                    </Typography.Text>
+                  </div>
+                  {l.cancellable && (
+                    <Popconfirm
+                      title="Энэ хичээлийг цуцлах уу?"
+                      okText="Тийм"
+                      cancelText="Үгүй"
+                      onConfirm={() => cancel.mutate(l._id)}
+                    >
+                      <Button size="small" danger loading={cancel.isPending}>
+                        Цуцлах
+                      </Button>
+                    </Popconfirm>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <Typography.Text strong style={{ fontSize: 13 }}>
             {data.month} сарын бүртгэл ({data.lessons.length})
@@ -624,7 +812,11 @@ export default function TeacherStudentsPage() {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>
                     {studentName(s)}
                   </div>
-                  <Space size={8} wrap style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+                  <Space
+                    size={8}
+                    wrap
+                    style={{ fontSize: 12, color: "#888", marginTop: 2 }}
+                  >
                     <span>{s.code}</span>
                     <span>{STUDENT_LEVEL_LABEL[s.level] ?? "—"}</span>
                     {s.parentName && (
