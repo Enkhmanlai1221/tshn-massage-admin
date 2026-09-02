@@ -366,6 +366,81 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
 }
 
 /**
+ * ӨМНӨ ОРСОН ХИЧЭЭЛ — «8-аас 3-ыг нь аль хэдийн орсон».
+ *
+ * Сурагч системд бүртгэгдэхээсээ өмнө тэр сард хэдэн хичээл орсныг багш нэг
+ * товшилтоор оруулна. Огноо, цаг, өрөө асуухгүй — багш тэдгээрийг санахгүй.
+ * Хуурамч хичээл ч үүсгэхгүй: зөвхөн тоолуурт нэмэгдэнэ.
+ */
+function PriorEntries({
+  studentId,
+  progress,
+}: {
+  studentId: string;
+  progress: any;
+}) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+
+  const save = useMutation({
+    mutationFn: async (count: number) =>
+      teacherApi.put(`/student/${studentId}/prior`, { count }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      qc.invalidateQueries({ queryKey: ["teacher-student", studentId] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  const current = progress?.prior ?? 0;
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 12,
+      }}
+    >
+      <Typography.Text strong style={{ fontSize: 13 }}>
+        Өмнө орсон хичээл
+      </Typography.Text>
+      <Typography.Paragraph
+        type="secondary"
+        style={{ fontSize: 12, margin: "2px 0 8px" }}
+      >
+        Системд бүртгэхээс өмнө энэ сард хэдэн удаа орсон бэ? Огноо хэрэггүй —
+        зөвхөн тоог дар.
+      </Typography.Paragraph>
+      <Space size={[6, 6]} wrap>
+        {Array.from({ length: (progress?.quota ?? 8) + 1 }, (_, n) => (
+          <Button
+            key={n}
+            size="small"
+            type={n === current ? "primary" : "default"}
+            loading={save.isPending && save.variables === n}
+            onClick={() => save.mutate(n)}
+          >
+            {n}
+          </Button>
+        ))}
+      </Space>
+      {current > 0 && (
+        <Typography.Paragraph
+          type="secondary"
+          style={{ fontSize: 12, margin: "8px 0 0" }}
+        >
+          {progress.attendedLessons} системд бүртгэгдсэн + {current} өмнөх ={" "}
+          <b>{progress.attended}</b> оролт
+        </Typography.Paragraph>
+      )}
+    </div>
+  );
+}
+
+/**
  * НЭМЭЛТ ХИЧЭЭЛ ТОВЛОХ — «энэ долоо хоногт 3-4 удаа орно» гэж тохирсон үед.
  *
  * Үндсэн хуваарь долоо хоногт 2 хэвээр. Энэ хэсэг нь тухайн өдрийн СУЛ цагийг
@@ -631,6 +706,8 @@ function StudentSheet({
               <Radio.Button value="EXCUSED">Чөлөөтэй</Radio.Button>
             </Radio.Group>
           </div>
+
+          <PriorEntries studentId={id!} progress={p} />
 
           <BookLesson studentId={id!} />
 
