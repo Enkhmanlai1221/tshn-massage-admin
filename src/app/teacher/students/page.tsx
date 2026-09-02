@@ -13,6 +13,7 @@ import {
   Progress,
   Radio,
   Select,
+  Collapse,
   Popconfirm,
   Skeleton,
   Space,
@@ -364,13 +365,21 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
     </Drawer>
   );
 }
+const card: React.CSSProperties = {
+  background: "#fff",
+  borderRadius: 12,
+  padding: 12,
+  marginBottom: 12,
+};
+
+const dayLabel = (d: dayjs.Dayjs) =>
+  `${d.format("MM сарын DD")} · ${WEEKDAY_LABEL[d.day()]}`;
 
 /**
  * ӨМНӨ ОРСОН ХИЧЭЭЛ — «8-аас 3-ыг нь аль хэдийн орсон».
  *
- * Сурагч системд бүртгэгдэхээсээ өмнө тэр сард хэдэн хичээл орсныг багш нэг
- * товшилтоор оруулна. Огноо, цаг, өрөө асуухгүй — багш тэдгээрийг санахгүй.
- * Хуурамч хичээл ч үүсгэхгүй: зөвхөн тоолуурт нэмэгдэнэ.
+ * Сурагч бүр дээр САРД НЭГ УДАА хийгддэг үйлдэл тул нугалж хаасан байдаг —
+ * өдөр тутмын ирц бүртгэхэд саад болохгүй.
  */
 function PriorEntries({
   studentId,
@@ -396,46 +405,155 @@ function PriorEntries({
   const current = progress?.prior ?? 0;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 12,
-      }}
-    >
+    <Collapse
+      size="small"
+      style={{ marginBottom: 12, background: "#fff" }}
+      items={[
+        {
+          key: "prior",
+          label: (
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              Өмнө орсныг нэг дор оруулах
+              {current > 0 && (
+                <Tag color="purple" style={{ marginLeft: 8 }}>
+                  {current}
+                </Tag>
+              )}
+            </span>
+          ),
+          children: (
+            <>
+              <Typography.Paragraph
+                type="secondary"
+                style={{ fontSize: 12, margin: "0 0 10px" }}
+              >
+                Энэ сурагч системд бүртгэгдэхээс өмнө <b>энэ сард</b> хэдэн удаа
+                орсон бэ? Огноо санах шаардлагагүй — зөвхөн тоог дар.
+              </Typography.Paragraph>
+              <Space size={[8, 8]} wrap>
+                {Array.from({ length: (progress?.quota ?? 8) + 1 }, (_, n) => (
+                  <Button
+                    key={n}
+                    shape="circle"
+                    type={n === current ? "primary" : "default"}
+                    loading={save.isPending && save.variables === n}
+                    onClick={() => save.mutate(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+              </Space>
+              <Typography.Paragraph
+                type="secondary"
+                style={{ fontSize: 12, margin: "10px 0 0" }}
+              >
+                {current > 0 ? (
+                  <>
+                    Системд бүртгэсэн {progress.attendedLessons} + өмнөх{" "}
+                    {current} = <b>{progress.attended} оролт</b>
+                  </>
+                ) : (
+                  "Хэрэггүй бол 0 дээр үлдээнэ."
+                )}
+              </Typography.Paragraph>
+            </>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * ИРЦ БҮРТГЭХ — өнгөрсөн/өнөөдрийн оролт.
+ *
+ * Товч нь ЭНЭ БЛОК ДОТРОО байна: өмнө нь Drawer-ийн доод талд байсан тул
+ * доош гүйлгэсэн багш «энэ товч аль хэсэгт хамаарах вэ» гэж эргэлздэг байв.
+ */
+function MarkEntry({ studentId }: { studentId: string }) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const [date, setDate] = useState(dayjs());
+  const [status, setStatus] = useState("ATTENDED");
+
+  const add = useMutation({
+    mutationFn: async () =>
+      teacherApi.post(`/student/${studentId}/entry`, {
+        date: date.format("YYYY-MM-DD"),
+        status,
+      }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      qc.invalidateQueries({ queryKey: ["teacher-student", studentId] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  const isToday = date.isSame(dayjs(), "day");
+
+  return (
+    <div style={card}>
       <Typography.Text strong style={{ fontSize: 13 }}>
-        Өмнө орсон хичээл
+        Аль өдрийн ирц вэ?
       </Typography.Text>
+      <DatePicker
+        size="large"
+        style={{ width: "100%", marginTop: 8 }}
+        value={date}
+        onChange={(v) => v && setDate(v)}
+        format={(v) => dayLabel(v)}
+        inputReadOnly
+        allowClear={false}
+        disabledDate={(d) => d.isAfter(dayjs(), "day")}
+      />
+      {!isToday && (
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 12, display: "block", marginTop: 4 }}
+        >
+          Өнгөрсөн өдөр сонгосон байна.
+        </Typography.Text>
+      )}
+
+      <Typography.Text
+        strong
+        style={{ fontSize: 13, display: "block", marginTop: 14 }}
+      >
+        Тэр өдөр сурагч
+      </Typography.Text>
+      <Radio.Group
+        style={{ marginTop: 8, width: "100%" }}
+        buttonStyle="solid"
+        size="large"
+        value={status}
+        onChange={(e) => setStatus(e.target.value)}
+      >
+        <Radio.Button value="ATTENDED">Ирсэн</Radio.Button>
+        <Radio.Button value="ABSENT">Тасалсан</Radio.Button>
+        <Radio.Button value="EXCUSED">Чөлөөтэй</Radio.Button>
+      </Radio.Group>
+
+      <Button
+        type="primary"
+        block
+        size="large"
+        className="touch-btn"
+        icon={<CheckCircleOutlined />}
+        style={{ marginTop: 14 }}
+        loading={add.isPending}
+        onClick={() => add.mutate()}
+      >
+        Бүртгэх
+      </Button>
       <Typography.Paragraph
         type="secondary"
-        style={{ fontSize: 12, margin: "2px 0 8px" }}
+        style={{ fontSize: 12, margin: "8px 0 0" }}
       >
-        Системд бүртгэхээс өмнө энэ сард хэдэн удаа орсон бэ? Огноо хэрэггүй —
-        зөвхөн тоог дар.
+        Хуваарьт хичээл байвал түүн дээр бүртгэгдэнэ. Байхгүй бол нөхөх хичээл
+        автоматаар үүсээд ирц нь тавигдана.
       </Typography.Paragraph>
-      <Space size={[6, 6]} wrap>
-        {Array.from({ length: (progress?.quota ?? 8) + 1 }, (_, n) => (
-          <Button
-            key={n}
-            size="small"
-            type={n === current ? "primary" : "default"}
-            loading={save.isPending && save.variables === n}
-            onClick={() => save.mutate(n)}
-          >
-            {n}
-          </Button>
-        ))}
-      </Space>
-      {current > 0 && (
-        <Typography.Paragraph
-          type="secondary"
-          style={{ fontSize: 12, margin: "8px 0 0" }}
-        >
-          {progress.attendedLessons} системд бүртгэгдсэн + {current} өмнөх ={" "}
-          <b>{progress.attended}</b> оролт
-        </Typography.Paragraph>
-      )}
     </div>
   );
 }
@@ -480,65 +598,111 @@ function BookLesson({ studentId }: { studentId: string }) {
   });
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 12,
-      }}
-    >
+    <div style={card}>
       <Typography.Text strong style={{ fontSize: 13 }}>
-        Нэмэлт хичээл товлох
+        Аль өдөр нэмж орох вэ?
       </Typography.Text>
-      <Typography.Paragraph
-        type="secondary"
-        style={{ fontSize: 12, margin: "2px 0 0" }}
-      >
-        Тасалсанаа нөхөх, эсвэл тохиролцоод нэмж орох үед.
-      </Typography.Paragraph>
       <DatePicker
         size="large"
         style={{ width: "100%", marginTop: 8 }}
         value={day}
         onChange={(v) => v && setDay(v)}
-        format="YYYY-MM-DD"
+        format={(v) => dayLabel(v)}
         inputReadOnly
+        allowClear={false}
         disabledDate={(d) => d.isBefore(dayjs(), "day")}
       />
+
+      <Typography.Text
+        strong
+        style={{ fontSize: 13, display: "block", marginTop: 14 }}
+      >
+        Сул цаг {data?.count ? `(${data.count})` : ""}
+      </Typography.Text>
+      <Typography.Paragraph
+        type="secondary"
+        style={{ fontSize: 12, margin: "2px 0 8px" }}
+      >
+        Дарахад тэр цагт хичээл товлогдоно.
+      </Typography.Paragraph>
+
       {isFetching ? (
-        <Skeleton active paragraph={{ rows: 1 }} style={{ marginTop: 10 }} />
+        <Skeleton active paragraph={{ rows: 2 }} />
       ) : !data?.rows?.length ? (
-        <Typography.Text
-          type="secondary"
-          style={{ fontSize: 12, display: "block", marginTop: 8 }}
-        >
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
           Тэр өдөр сул цаг алга. Өөр өдөр сонгоно уу.
         </Typography.Text>
       ) : (
-        <Space size={[6, 6]} wrap style={{ marginTop: 10 }}>
+        <div
+          style={{
+            display: "grid",
+            // 375px дэлгэцэд 2 багана багтана (Drawer + карт padding хассаны дараа ~300px).
+            gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
+            gap: 8,
+          }}
+        >
           {data.rows.map((r: any) => (
             <Button
               key={r.slotIndex}
-              size="small"
+              className="touch-btn"
               loading={book.isPending}
               onClick={() => book.mutate(r)}
+              style={{ height: "auto", padding: "8px 6px", lineHeight: 1.3 }}
             >
-              {r.timeLabel} · {r.rooms[0].name}
+              <div style={{ fontWeight: 600 }}>{r.timeLabel}</div>
+              <div style={{ fontSize: 11, color: "#888" }}>
+                {r.rooms[0].name}
+              </div>
             </Button>
           ))}
-        </Space>
+        </div>
       )}
     </div>
   );
 }
 
+/** Хичээлийн нэг мөр — огноо, цаг, өрөө, төлөв. */
+function LessonRow({
+  lesson,
+  right,
+}: {
+  lesson: any;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 0",
+        borderBottom: "1px solid #f0f0f0",
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14 }}>
+          {lesson.date} · {lesson.weekdayLabel}
+          {lesson.type !== "REGULAR" && (
+            <Tag color="purple" style={{ marginLeft: 6 }}>
+              {lesson.typeLabel}
+            </Tag>
+          )}
+        </div>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {lesson.timeLabel} · {lesson.room?.name ?? "—"}
+        </Typography.Text>
+      </div>
+      {right}
+    </div>
+  );
+}
+
 /**
- * Сурагчийн хуудас — сарын оролтууд ба «Оролт нэмэх».
+ * Сурагчийн хуудас.
  *
- * Багш календарь хайх шаардлагагүй: огноо (анхдагч нь өнөөдөр) + төлөв сонгоод
- * нэг товч дарна. Хуваарьт хичээл байвал түүн дээр бүртгэгдэнэ, байхгүй бол
- * сервер нөхөх хичээл үүсгэнэ.
+ * Гурван ажил (ирц бүртгэх / хичээл товлох / түүх харах) нь ТАБААР салсан —
+ * өмнө нь гурвуулаа нэг доор дараалж, аль товч аль блокт хамаарахыг ялгахад
+ * хэцүү байв. Одоо нэг мөчид ганц ажил харагдана.
  */
 function StudentSheet({
   id,
@@ -549,28 +713,12 @@ function StudentSheet({
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [date, setDate] = useState(dayjs());
-  const [status, setStatus] = useState("ATTENDED");
+  const [tab, setTab] = useState("mark");
 
   const { data, isLoading } = useQuery({
     queryKey: ["teacher-student", id],
     enabled: !!id,
     queryFn: async () => (await teacherApi.get(`/student/${id}`)).data,
-  });
-
-  const add = useMutation({
-    mutationFn: async () =>
-      teacherApi.post(`/student/${id}/entry`, {
-        date: date.format("YYYY-MM-DD"),
-        status,
-      }),
-    onSuccess: (res) => {
-      message.success(res.data.message);
-      qc.invalidateQueries({ queryKey: ["teacher-student", id] });
-      qc.invalidateQueries({ queryKey: ["teacher-students"] });
-      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
-    },
-    onError: (e) => message.error(teacherApiError(e)),
   });
 
   const cancel = useMutation({
@@ -592,41 +740,28 @@ function StudentSheet({
     <Drawer
       title={data ? studentName(data.student) : "Сурагч"}
       placement="bottom"
-      height="88%"
+      height="92%"
       open={!!id}
       onClose={onClose}
-      styles={{ body: { paddingTop: 8 } }}
-      footer={
-        <Button
-          type="primary"
-          block
-          className="touch-btn"
-          icon={<CheckCircleOutlined />}
-          loading={add.isPending}
-          onClick={() => add.mutate()}
-        >
-          Оролт бүртгэх
-        </Button>
-      }
+      styles={{ body: { paddingTop: 8, background: "#f6f6f7" } }}
     >
       {isLoading || !data ? (
         <Spin style={{ display: "block", margin: "40px auto" }} />
       ) : (
         <>
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 12,
-              padding: 12,
-              marginBottom: 12,
-            }}
-          >
-            <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1 }}>
-              {p.attended}
-              <span style={{ fontSize: 16, color: "#888" }}>/{p.quota}</span>
+          {/* Тойм — «энэ сард хэдэн оролт орсон» гэдэг хамгийн чухал тоо. */}
+          <div style={card}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ fontSize: 30, fontWeight: 700, lineHeight: 1 }}>
+                {p.attended}
+              </span>
+              <span style={{ fontSize: 18, color: "#888" }}>/ {p.quota}</span>
+              <span style={{ marginLeft: "auto", fontSize: 13, color: "#888" }}>
+                {p.remaining > 0 ? `${p.remaining} үлдлээ` : "дүүрсэн"}
+              </span>
             </div>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {data.month} сарын оролт · үлдсэн {p.remaining}
+              {data.month} сард ирсэн оролт
             </Typography.Text>
             <Progress
               percent={Math.min(100, Math.round((p.attended / p.quota) * 100))}
@@ -635,11 +770,19 @@ function StudentSheet({
                 p.over ? "#f59e0b" : p.filled ? "#22c55e" : "#7c3aed"
               }
             />
-            <Space size={6} wrap style={{ fontSize: 12 }}>
-              <Tag color="red">Тасалсан {p.absent}</Tag>
-              <Tag color="orange">Чөлөөтэй {p.excused}</Tag>
-              <Tag color="blue">Товлогдсон {p.scheduled}</Tag>
+            <Space size={[6, 6]} wrap style={{ fontSize: 12 }}>
+              {p.absent > 0 && <Tag color="red">Тасалсан {p.absent}</Tag>}
+              {p.excused > 0 && <Tag color="orange">Чөлөөтэй {p.excused}</Tag>}
+              {p.scheduled > 0 && (
+                <Tag color="blue">Товлогдсон {p.scheduled}</Tag>
+              )}
+              {p.prior > 0 && <Tag color="purple">Өмнөх {p.prior}</Tag>}
             </Space>
+            {!!data.schedule?.length && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#888" }}>
+                Тогтмол цаг: {data.schedule.map((s: any) => s.label).join(" · ")}
+              </div>
+            )}
           </div>
 
           {/* Норм дүүрсэн эсэх. Хурдац чөлөөтэй — эхний 7 хоногтоо 7 оролт
@@ -656,145 +799,125 @@ function StudentSheet({
               }
               description={
                 p.scheduled > 0
-                  ? `Энэ сард товлогдсон ${p.scheduled} хичээл үлдсэн байна. Орохгүй бол админд хэлж цуцлуулна уу — эс тэгвээс тасалсанд тооцогдоно.`
+                  ? `Энэ сард товлогдсон ${p.scheduled} хичээл үлдсэн. Орохгүй бол «Хичээл товлох» хэсгээс цуцлаарай — эс тэгвээс тасалсанд тооцогдоно.`
                   : undefined
               }
             />
           )}
 
-          {!!data.schedule?.length && (
-            <div style={{ marginBottom: 12 }}>
-              <Typography.Text strong style={{ fontSize: 13 }}>
-                Тогтмол цаг
-              </Typography.Text>
-              <div style={{ marginTop: 4 }}>
-                {data.schedule.map((s: any, i: number) => (
-                  <Tag key={i}>{s.label}</Tag>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 12,
-              padding: 12,
-              marginBottom: 12,
-            }}
+          {/* Таб — `Segmented` БИШ. Segmented-ийн гулсдаг тэмдэглэгээ (thumb)
+              нь CSS transition дуусахыг хүлээдэг тул сул утсан дээр идэвхтэй
+              таб нэг алхам хоцорч харагдана. Radio.Group нь ангиллаараа шууд
+              будагддаг тул ийм асуудалгүй. Шошго БОГИНО — 375px-д 3 багтана. */}
+          <Radio.Group
+            buttonStyle="solid"
+            size="large"
+            value={tab}
+            onChange={(e) => setTab(e.target.value)}
+            style={{ display: "flex", width: "100%", marginBottom: 12 }}
           >
-            <Typography.Text strong style={{ fontSize: 13 }}>
-              Оролт нэмэх
-            </Typography.Text>
-            <DatePicker
-              size="large"
-              style={{ width: "100%", marginTop: 8 }}
-              value={date}
-              onChange={(v) => v && setDate(v)}
-              format="YYYY-MM-DD"
-              inputReadOnly
-              disabledDate={(d) => d.isAfter(dayjs(), "day")}
-            />
-            <Radio.Group
-              style={{ marginTop: 8, width: "100%" }}
-              buttonStyle="solid"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <Radio.Button value="ATTENDED">Ирсэн</Radio.Button>
-              <Radio.Button value="ABSENT">Тасалсан</Radio.Button>
-              <Radio.Button value="EXCUSED">Чөлөөтэй</Radio.Button>
-            </Radio.Group>
-          </div>
+            {[
+              { value: "mark", label: "Ирц" },
+              { value: "book", label: "Товлох" },
+              { value: "history", label: `Түүх ${data.lessons.length}` },
+            ].map((t) => (
+              <Radio.Button
+                key={t.value}
+                value={t.value}
+                style={{ flex: 1, textAlign: "center" }}
+              >
+                {t.label}
+              </Radio.Button>
+            ))}
+          </Radio.Group>
 
-          <PriorEntries studentId={id!} progress={p} />
-
-          <BookLesson studentId={id!} />
-
-          {!!data.upcoming?.length && (
-            <div style={{ marginBottom: 12 }}>
-              <Typography.Text strong style={{ fontSize: 13 }}>
-                Товлогдсон хичээл ({data.upcoming.length})
-              </Typography.Text>
-              {data.upcoming.map((l: any) => (
-                <div
-                  key={l._id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: "8px 0",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14 }}>
-                      {l.date} · {l.weekdayLabel}
-                      {l.type !== "REGULAR" && (
-                        <Tag color="purple" style={{ marginLeft: 6 }}>
-                          {l.typeLabel}
-                        </Tag>
-                      )}
-                    </div>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {l.timeLabel} · {l.room?.name ?? "—"}
-                    </Typography.Text>
-                  </div>
-                  {l.cancellable && (
-                    <Popconfirm
-                      title="Энэ хичээлийг цуцлах уу?"
-                      okText="Тийм"
-                      cancelText="Үгүй"
-                      onConfirm={() => cancel.mutate(l._id)}
-                    >
-                      <Button size="small" danger loading={cancel.isPending}>
-                        Цуцлах
-                      </Button>
-                    </Popconfirm>
-                  )}
-                </div>
-              ))}
-            </div>
+          {tab === "mark" && (
+            <>
+              <MarkEntry studentId={id!} />
+              <PriorEntries studentId={id!} progress={p} />
+            </>
           )}
 
-          <Typography.Text strong style={{ fontSize: 13 }}>
-            {data.month} сарын бүртгэл ({data.lessons.length})
-          </Typography.Text>
-          {!data.lessons.length ? (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Бичлэг алга"
-              style={{ padding: "24px 0" }}
-            />
-          ) : (
-            data.lessons.map((l: any) => (
+          {tab === "book" && (
+            <>
               <div
-                key={l._id}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 0",
-                  borderBottom: "1px solid #f0f0f0",
+                  ...card,
+                  background: "#f0eaff",
+                  fontSize: 12,
+                  color: "#555",
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14 }}>
-                    {l.date} · {l.weekdayLabel}
-                  </div>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {l.timeLabel} · {l.room?.name ?? "—"}
-                    {l.type !== "REGULAR" ? ` · ${l.typeLabel}` : ""}
-                  </Typography.Text>
-                </div>
-                <Tag
-                  color={LESSON_STATUS_COLOR[l.status]}
-                  style={{ marginInlineEnd: 0 }}
-                >
-                  {LESSON_STATUS_LABEL[l.status] ?? l.status}
-                </Tag>
+                Тасалсанаа нөхөх, эсвэл сурагчтай тохиролцоод тухайн долоо
+                хоногт нэмж орох хичээл. Үндсэн хуваарь өөрчлөгдөхгүй.
               </div>
-            ))
+              <BookLesson studentId={id!} />
+
+              <div style={card}>
+                <Typography.Text strong style={{ fontSize: 13 }}>
+                  Товлогдсон хичээл ({data.upcoming?.length ?? 0})
+                </Typography.Text>
+                {!data.upcoming?.length ? (
+                  <Typography.Paragraph
+                    type="secondary"
+                    style={{ fontSize: 12, margin: "8px 0 0" }}
+                  >
+                    Товлогдсон хичээл алга.
+                  </Typography.Paragraph>
+                ) : (
+                  data.upcoming.map((l: any) => (
+                    <LessonRow
+                      key={l._id}
+                      lesson={l}
+                      right={
+                        l.cancellable ? (
+                          <Popconfirm
+                            title="Энэ хичээлийг цуцлах уу?"
+                            okText="Тийм"
+                            cancelText="Үгүй"
+                            onConfirm={() => cancel.mutate(l._id)}
+                          >
+                            <Button size="small" danger>
+                              Цуцлах
+                            </Button>
+                          </Popconfirm>
+                        ) : undefined
+                      }
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {tab === "history" && (
+            <div style={card}>
+              <Typography.Text strong style={{ fontSize: 13 }}>
+                {data.month} сарын бүртгэл
+              </Typography.Text>
+              {!data.lessons.length ? (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="Бичлэг алга"
+                  style={{ padding: "24px 0" }}
+                />
+              ) : (
+                data.lessons.map((l: any) => (
+                  <LessonRow
+                    key={l._id}
+                    lesson={l}
+                    right={
+                      <Tag
+                        color={LESSON_STATUS_COLOR[l.status]}
+                        style={{ marginInlineEnd: 0 }}
+                      >
+                        {LESSON_STATUS_LABEL[l.status] ?? l.status}
+                      </Tag>
+                    }
+                  />
+                ))
+              )}
+            </div>
           )}
         </>
       )}
