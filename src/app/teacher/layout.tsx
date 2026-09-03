@@ -63,7 +63,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     "/teacher";
 
   return (
-    <div className="teacher-shell" style={{ background: "#f6f6f7", minHeight: "100vh" }}>
+    <div className="teacher-shell" style={{ background: "#eceef1", minHeight: "100vh" }}>
       {/* Толгой — нимгэн, наалдсан */}
       <header
         style={{

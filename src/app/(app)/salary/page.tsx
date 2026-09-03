@@ -83,12 +83,39 @@ function PreviewDrawer({
         <>
           <Space size={48} style={{ marginBottom: 16 }}>
             <Statistic title="Хичээл" value={data.lessonCount} />
+            {data.priorCount > 0 && (
+              <Statistic title="Өмнө орсон" value={data.priorCount} />
+            )}
             <Statistic
               title="Нийт"
               value={data.totalAmount}
               formatter={(v) => money(Number(v))}
             />
           </Space>
+
+          {/* «Өмнө орсон» хичээл нь Lesson бүртгэлгүй тул доорх хүснэгтэд
+              харагдахгүй — эндээс задаргааг нь харуулна. */}
+          {data.priorCount > 0 && (
+            <Alert
+              type="warning"
+              style={{ marginBottom: 12 }}
+              message={`Өмнө орсон хичээл: ${data.priorCount} ширхэг, ${money(data.priorAmount)}`}
+              description={
+                <>
+                  <div style={{ marginBottom: 4 }}>
+                    Багш системд бүртгэхээс өмнө заасан, огноогүй хичээлүүд.
+                    Доорх хүснэгтэд ороогүй ч нийт дүнд тооцогдоно.
+                  </div>
+                  {data.priorItems?.map((i: any, n: number) => (
+                    <div key={n}>
+                      {i.studentName} · {i.monthKey} — {i.count} × {money(i.rate)}{" "}
+                      = <b>{money(i.amount)}</b>
+                    </div>
+                  ))}
+                </>
+              }
+            />
+          )}
           {data.excluded?.length > 0 && (
             <Alert
               type="info"
@@ -130,7 +157,8 @@ function PreviewDrawer({
               },
             ]}
           />
-          {can("SALARY", "isWrite") && data.lessonCount > 0 && (
+          {can("SALARY", "isWrite") &&
+            data.lessonCount + data.priorCount > 0 && (
             <Button
               type="primary"
               block
@@ -140,7 +168,7 @@ function PreviewDrawer({
             >
               Тооцоо үүсгэх ({money(data.totalAmount)})
             </Button>
-          )}
+            )}
         </>
       )}
     </Drawer>

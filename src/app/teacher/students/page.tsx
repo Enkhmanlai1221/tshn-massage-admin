@@ -55,32 +55,51 @@ interface Available {
 
 const onlyDigits = (v: string) => (v || "").replace(/\D/g, "").slice(0, 8);
 
-/** «3/8» — сарын оролтын явц. Норм биелсэн бол ногоон. */
-function MonthProgress({ month }: { month?: any }) {
+/**
+ * «4/8 оролт» — сарын явцын нимгэн зурвас.
+ *
+ * Өнгөний дэглэм: дүүрсэн бол ногоон, хоцорч байвал (25%-аас бага) шар
+ * анхааруулга, бусад нь саарал — ягаан зөвхөн дарж болох зүйлд үлдэнэ.
+ */
+function MonthBar({ month }: { month?: any }) {
   if (!month) return null;
   const { attended = 0, quota = 8 } = month;
   const done = attended >= quota;
+  const low = !done && attended / quota < 0.25;
+  const color = done ? "#16a34a" : low ? "#d97706" : "#6b7280";
   return (
-    <div style={{ marginTop: 8 }}>
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}
+    >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 12,
-          marginBottom: 2,
+          flex: 1,
+          height: 6,
+          background: "#f0f1f3",
+          borderRadius: 3,
+          overflow: "hidden",
         }}
       >
-        <span style={{ color: "#888" }}>Энэ сарын оролт</span>
-        <span style={{ fontWeight: 600, color: done ? "#22c55e" : "#7c3aed" }}>
-          {attended}/{quota}
-        </span>
+        <div
+          style={{
+            width: `${Math.min(100, Math.round((attended / quota) * 100))}%`,
+            height: "100%",
+            background: color,
+            borderRadius: 3,
+          }}
+        />
       </div>
-      <Progress
-        percent={Math.min(100, Math.round((attended / quota) * 100))}
-        showInfo={false}
-        size="small"
-        strokeColor={done ? "#22c55e" : "#7c3aed"}
-      />
+      <div
+        style={{
+          fontSize: 12,
+          color: low ? "#b45309" : "#4b5563",
+          flexShrink: 0,
+        }}
+      >
+        Энэ сар{" "}
+        <b style={{ color: low ? "#b45309" : "#111827" }}>{attended}</b>/{quota}{" "}
+        оролт
+      </div>
     </div>
   );
 }
@@ -384,25 +403,35 @@ const dayLabel = (d: dayjs.Dayjs) =>
 function PriorEntries({
   studentId,
   progress,
+  prior,
 }: {
   studentId: string;
   progress: any;
+  prior: any;
 }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
 
   const save = useMutation({
-    mutationFn: async (count: number) =>
-      teacherApi.put(`/student/${studentId}/prior`, { count }),
+    mutationFn: async (body: { count?: number; paidBefore?: number }) =>
+      teacherApi.put(`/student/${studentId}/prior`, {
+        count: body.count ?? current,
+        paidBefore: body.paidBefore ?? paidBefore,
+      }),
     onSuccess: (res) => {
       message.success(res.data.message);
       qc.invalidateQueries({ queryKey: ["teacher-student", studentId] });
       qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-salary"] });
     },
     onError: (e) => message.error(teacherApiError(e)),
   });
 
-  const current = progress?.prior ?? 0;
+  const current = prior?.count ?? progress?.prior ?? 0;
+  const paidBefore = prior?.paidBefore ?? 0;
+  const payoutCount = prior?.payoutCount ?? 0;
+  const unpaid = prior?.unpaid ?? 0;
+  const money = (n: number) => `${(n ?? 0).toLocaleString()}₮`;
 
   return (
     <Collapse
@@ -415,8 +444,12 @@ function PriorEntries({
             <span style={{ fontSize: 13, fontWeight: 600 }}>
               Өмнө орсныг нэг дор оруулах
               {current > 0 && (
-                <Tag color="purple" style={{ marginLeft: 8 }}>
+                <Tag
+                  color={unpaid > 0 ? "purple" : "green"}
+                  style={{ marginLeft: 8 }}
+                >
                   {current}
+                  {unpaid > 0 ? ` · ${unpaid} цалинтай` : " · цалинжсан"}
                 </Tag>
               )}
             </span>
@@ -436,26 +469,81 @@ function PriorEntries({
                     key={n}
                     shape="circle"
                     type={n === current ? "primary" : "default"}
-                    loading={save.isPending && save.variables === n}
-                    onClick={() => save.mutate(n)}
+                    loading={save.isPending && save.variables?.count === n}
+                    onClick={() => save.mutate({ count: n })}
                   >
                     {n}
                   </Button>
                 ))}
               </Space>
-              <Typography.Paragraph
-                type="secondary"
-                style={{ fontSize: 12, margin: "10px 0 0" }}
-              >
-                {current > 0 ? (
-                  <>
-                    Системд бүртгэсэн {progress.attendedLessons} + өмнөх{" "}
-                    {current} = <b>{progress.attended} оролт</b>
-                  </>
-                ) : (
-                  "Хэрэггүй бол 0 дээр үлдээнэ."
-                )}
-              </Typography.Paragraph>
+
+              {current > 0 && (
+                <>
+                  <Typography.Paragraph
+                    type="secondary"
+                    style={{ fontSize: 12, margin: "14px 0 6px" }}
+                  >
+                    Эдгээрээс хэдийнх нь <b>цалингаа аль хэдийн авсан</b> бэ?
+                  </Typography.Paragraph>
+                  <Space size={[8, 8]} wrap>
+                    {Array.from({ length: current + 1 }, (_, n) => (
+                      <Button
+                        key={n}
+                        shape="circle"
+                        disabled={n < payoutCount}
+                        type={n === paidBefore ? "primary" : "default"}
+                        loading={
+                          save.isPending && save.variables?.paidBefore === n
+                        }
+                        onClick={() => save.mutate({ paidBefore: n })}
+                      >
+                        {n}
+                      </Button>
+                    ))}
+                  </Space>
+
+                  <div
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 10,
+                      borderTop: "1px solid #f0f0f0",
+                      fontSize: 12,
+                      color: "#555",
+                    }}
+                  >
+                    <div>
+                      Системд бүртгэсэн {progress.attendedLessons} + өмнөх{" "}
+                      {current} = <b>{progress.attended} оролт</b>
+                    </div>
+                    {payoutCount > 0 && (
+                      <div style={{ marginTop: 4 }}>
+                        Цалингийн тооцоонд орсон: <b>{payoutCount}</b>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 4 }}>
+                      {unpaid > 0 ? (
+                        <>
+                          Дараагийн цалинд орох:{" "}
+                          <b style={{ color: "#7c3aed" }}>
+                            {unpaid} × {money(prior?.rate)} ={" "}
+                            {money(prior?.amount)}
+                          </b>
+                        </>
+                      ) : (
+                        "Цалин бүрэн тооцогдсон."
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+              {current === 0 && (
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ fontSize: 12, margin: "10px 0 0" }}
+                >
+                  Хэрэггүй бол 0 дээр үлдээнэ.
+                </Typography.Paragraph>
+              )}
             </>
           ),
         },
@@ -780,7 +868,8 @@ function StudentSheet({
             </Space>
             {!!data.schedule?.length && (
               <div style={{ marginTop: 8, fontSize: 12, color: "#888" }}>
-                Тогтмол цаг: {data.schedule.map((s: any) => s.label).join(" · ")}
+                Тогтмол цаг:{" "}
+                {data.schedule.map((s: any) => s.label).join(" · ")}
               </div>
             )}
           </div>
@@ -834,7 +923,7 @@ function StudentSheet({
           {tab === "mark" && (
             <>
               <MarkEntry studentId={id!} />
-              <PriorEntries studentId={id!} progress={p} />
+              <PriorEntries studentId={id!} progress={p} prior={data.prior} />
             </>
           )}
 
@@ -946,40 +1035,33 @@ export default function TeacherStudentsPage() {
     const done = rows.filter(
       (r) => (r.month?.attended ?? 0) >= (r.month?.quota ?? 8),
     ).length;
-    return { done, total: rows.length };
+    const active = rows.filter((r) => r.status === "ACTIVE").length;
+    const paused = rows.filter((r) => r.status === "PAUSED").length;
+    const left = rows.filter(
+      (r) => r.status !== "ACTIVE" && r.status !== "PAUSED",
+    ).length;
+    return { done, total: rows.length, active, paused, left };
   }, [data]);
 
   return (
     <div>
-      <Input.Search
-        size="large"
-        placeholder="Нэр, код, утсаар хайх"
-        allowClear
-        onSearch={setQuery}
-        style={{ marginBottom: 12 }}
-      />
-
+      {/* Гарчиг + «Нэмэх» — жагсаалтад ягаан товч ЗӨВХӨН энд. */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 8,
+          alignItems: "flex-end",
+          gap: 10,
+          marginBottom: 12,
         }}
       >
-        <div>
-          <Typography.Text strong>
-            Миний сурагчид ({data?.count ?? 0})
-          </Typography.Text>
-          {!!summary.total && (
-            <Typography.Text
-              type="secondary"
-              style={{ display: "block", fontSize: 12 }}
-            >
-              {summary.done}/{summary.total} нь сарын {data?.quota ?? 8} оролтоо
-              гүйцээсэн
-            </Typography.Text>
-          )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>
+            Сурагч
+          </div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
+            {summary.active} идэвхтэй · {data?.quota ?? 8} оролтоос{" "}
+            {summary.done} гүйцээсэн
+          </div>
         </div>
         <Button
           type="primary"
@@ -991,6 +1073,14 @@ export default function TeacherStudentsPage() {
         </Button>
       </div>
 
+      <Input.Search
+        size="large"
+        placeholder="Нэр, код, утсаар хайх"
+        allowClear
+        onSearch={setQuery}
+        style={{ marginBottom: 16 }}
+      />
+
       {isLoading ? (
         <Skeleton active paragraph={{ rows: 5 }} />
       ) : !data?.rows?.length ? (
@@ -1000,65 +1090,90 @@ export default function TeacherStudentsPage() {
           style={{ padding: "40px 0" }}
         />
       ) : (
-        data.rows.map((s: any) => {
-          const phone = s.phone || s.parentPhone;
-          return (
-            <div key={s._id} className="lesson-card">
+        <div className="row-card">
+          {data.rows.map((s: any) => {
+            const phone = s.phone || s.parentPhone;
+            return (
               <div
-                style={{ display: "flex", alignItems: "center", gap: 10 }}
+                key={s._id}
+                style={{ padding: 14, cursor: "pointer" }}
                 onClick={() => setSheet(s._id)}
               >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>
-                    {studentName(s)}
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: 12 }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600 }}>
+                      {studentName(s)}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#6b7280",
+                        marginTop: 2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {s.code} · {STUDENT_LEVEL_LABEL[s.level] ?? "—"}
+                      {s.status !== "ACTIVE" && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <span
+                            style={{
+                              color:
+                                STUDENT_STATUS_COLOR[s.status] ?? "#9ca3af",
+                            }}
+                          >
+                            {STUDENT_STATUS_LABEL[s.status]}
+                          </span>
+                        </>
+                      )}
+                      {s.parentName && (
+                        <span>
+                          {" "}
+                          · <UserOutlined /> {s.parentName}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <Space
-                    size={8}
-                    wrap
-                    style={{ fontSize: 12, color: "#888", marginTop: 2 }}
+                  {phone && (
+                    <a
+                      href={`tel:${phone}`}
+                      className="icon-btn"
+                      title={`${phone} руу залгах`}
+                      aria-label={`${phone} руу залгах`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <PhoneOutlined />
+                    </a>
+                  )}
+                  <div
+                    style={{ color: "#c4c8ce", fontSize: 15, flexShrink: 0 }}
                   >
-                    <span>{s.code}</span>
-                    <span>{STUDENT_LEVEL_LABEL[s.level] ?? "—"}</span>
-                    {s.parentName && (
-                      <span>
-                        <UserOutlined /> {s.parentName}
-                      </span>
-                    )}
-                  </Space>
+                    ›
+                  </div>
                 </div>
-                <Tag
-                  color={STUDENT_STATUS_COLOR[s.status]}
-                  style={{ marginInlineEnd: 0 }}
-                >
-                  {STUDENT_STATUS_LABEL[s.status]}
-                </Tag>
+                <MonthBar month={s.month} />
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <MonthProgress month={s.month} />
-
-              <Space.Compact block style={{ marginTop: 10 }}>
-                <Button
-                  type="primary"
-                  className="touch-btn"
-                  style={{ width: "55%" }}
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => setSheet(s._id)}
-                >
-                  Оролт
-                </Button>
-                {phone ? (
-                  <Button
-                    className="touch-btn"
-                    style={{ width: "45%" }}
-                    href={`tel:${phone}`}
-                  >
-                    <PhoneOutlined /> {phone}
-                  </Button>
-                ) : null}
-              </Space.Compact>
-            </div>
-          );
-        })
+      {!!summary.total && (
+        <div
+          style={{
+            fontSize: 12,
+            color: "#9ca3af",
+            textAlign: "center",
+            marginTop: 14,
+          }}
+        >
+          Завсарласан {summary.paused} · Гарсан {summary.left}
+        </div>
       )}
 
       <AddStudent open={open} onClose={() => setOpen(false)} />
