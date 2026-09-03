@@ -197,13 +197,13 @@ function TeacherTodayInner() {
               <div className="section-label" style={{ marginTop: 18 }}>
                 ТАВИГДСАН · {markedRows.length}
               </div>
-              {markedRows.some((l: any) => l._id === editing) ? (
-                markedRows.map((l: any) =>
-                  l._id === editing ? (
-                    <TeacherLessonCard key={l._id} lesson={l} />
-                  ) : null,
-                )
-              ) : null}
+              {markedRows.some((l: any) => l._id === editing)
+                ? markedRows.map((l: any) =>
+                    l._id === editing ? (
+                      <TeacherLessonCard key={l._id} lesson={l} />
+                    ) : null,
+                  )
+                : null}
               <div className="row-card">
                 {markedRows
                   .filter((l: any) => l._id !== editing)

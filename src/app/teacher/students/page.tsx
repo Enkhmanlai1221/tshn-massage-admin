@@ -96,9 +96,8 @@ function MonthBar({ month }: { month?: any }) {
           flexShrink: 0,
         }}
       >
-        Энэ сар{" "}
-        <b style={{ color: low ? "#b45309" : "#111827" }}>{attended}</b>/{quota}{" "}
-        оролт
+        Энэ сар <b style={{ color: low ? "#b45309" : "#111827" }}>{attended}</b>
+        /{quota} оролт
       </div>
     </div>
   );
@@ -1099,9 +1098,7 @@ export default function TeacherStudentsPage() {
                 style={{ padding: 14, cursor: "pointer" }}
                 onClick={() => setSheet(s._id)}
               >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: 12 }}
-                >
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 15, fontWeight: 600 }}>
                       {studentName(s)}
