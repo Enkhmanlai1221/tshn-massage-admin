@@ -699,7 +699,6 @@ function BookLesson({ studentId }: { studentId: string }) {
         allowClear={false}
         disabledDate={(d) => d.isBefore(dayjs(), "day")}
       />
-
       <Typography.Text
         strong
         style={{ fontSize: 13, display: "block", marginTop: 14 }}
@@ -712,7 +711,6 @@ function BookLesson({ studentId }: { studentId: string }) {
       >
         Дарахад тэр цагт хичээл товлогдоно.
       </Typography.Paragraph>
-
       {isFetching ? (
         <Skeleton active paragraph={{ rows: 2 }} />
       ) : !data?.rows?.length ? (

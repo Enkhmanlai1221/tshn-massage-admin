@@ -2,21 +2,135 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Space, Spin, Table, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Col,
+  Progress,
+  Row,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from "antd";
 import { WarningOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import StudentDrawer from "@/components/StudentDrawer";
-import { studentName } from "@/lib/labels";
+import { studentName, money } from "@/lib/labels";
+
+/**
+ * Сургуулийн хэмжээний сарын нэгтгэл — «бүх сурагчийн оролт нийлээд хэд вэ».
+ * Норм биелэлт + цалингийн явцыг нэг мөрөнд.
+ */
+function SummaryRow() {
+  const { can } = useAuth();
+  const canSalary = can("SALARY", "isRead");
+
+  const { data: s } = useQuery({
+    queryKey: ["students", "summary"],
+    queryFn: async () => (await api.get("/student/summary")).data,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  // Цалин: одоо байгаа цалингийн нэгтгэл endpoint — жинхэнэ цалингийн
+  // дүрмээр (тасалтын дүрэм, өмнөх оролт, олгогдсоныг хасаад) бодогдоно.
+  const { data: salary } = useQuery({
+    enabled: canSalary,
+    queryKey: ["salary", "month-summary"],
+    queryFn: async () =>
+      (
+        await api.get("/salary/summary", {
+          params: {
+            from: dayjs().startOf("month").format("YYYY-MM-DD"),
+            to: dayjs().endOf("month").format("YYYY-MM-DD"),
+          },
+        })
+      ).data,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  if (!s) return null;
+
+  return (
+    <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+      <Col xs={12} sm={8} lg={5}>
+        <Card size="small">
+          <Statistic
+            title="Идэвхтэй сурагч"
+            value={s.activeStudents}
+            suffix={
+              s.pausedStudents > 0 ? (
+                <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                  +{s.pausedStudents} завсарласан
+                </Typography.Text>
+              ) : undefined
+            }
+          />
+        </Card>
+      </Col>
+      <Col xs={12} sm={8} lg={5}>
+        <Card size="small">
+          <Statistic
+            title={`Сарын оролт (${s.monthKey})`}
+            value={s.attended}
+            suffix={`/ ${s.totalQuota}`}
+          />
+          <Progress
+            percent={s.fillPercent}
+            size="small"
+            style={{ marginBottom: 0 }}
+          />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            системд {s.attendedLessons} + өмнөх {s.prior}
+          </Typography.Text>
+        </Card>
+      </Col>
+      <Col xs={12} sm={8} lg={4}>
+        <Card size="small">
+          <Statistic
+            title="Тасалсан / Чөлөөтэй"
+            value={s.absent}
+            suffix={`/ ${s.excused}`}
+            valueStyle={s.absent > 0 ? { color: "#cf1322" } : undefined}
+          />
+        </Card>
+      </Col>
+      <Col xs={12} sm={8} lg={4}>
+        <Card size="small">
+          <Statistic title="Товлогдсон үлдсэн" value={s.scheduled} />
+        </Card>
+      </Col>
+      {canSalary && salary && (
+        <Col xs={12} sm={8} lg={6}>
+          <Card size="small">
+            <Statistic
+              title="Олгогдоогүй цалин (энэ сар)"
+              value={money(salary.totalAmount)}
+            />
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {salary.totalLessons} хичээл цалинд бодогдоно
+            </Typography.Text>
+          </Card>
+        </Col>
+      )}
+    </Row>
+  );
+}
 
 /**
  * Дашбоард — админ нэвтрээд хамгийн түрүүнд харах дэлгэц.
  *
- * Гол хэсэг нь «оролт дуусах гэж буй сурагчид»: энэ сарын нормд 2 ба түүнээс
- * цөөн оролт үлдсэн сурагчдыг жагсааж, хуваарь сунгах/төлбөр авах цаг
- * болсныг анхааруулна.
+ * Дээр нь сургуулийн сарын нэгтгэл, доор нь «оролт дуусах гэж буй сурагчид»:
+ * энэ сарын нормд 2 ба түүнээс цөөн оролт үлдсэн сурагчдыг жагсааж, хуваарь
+ * сунгах/төлбөр авах цаг болсныг анхааруулна.
  */
 export default function DashboardPage() {
   const router = useRouter();
@@ -38,6 +152,8 @@ export default function DashboardPage() {
   return (
     <div>
       <Typography.Title level={3}>Дашбоард</Typography.Title>
+
+      {canStudent && <SummaryRow />}
 
       {!canStudent ? (
         <Alert

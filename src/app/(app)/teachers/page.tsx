@@ -110,6 +110,33 @@ export default function TeachersPage() {
             ),
           },
           {
+            title: "Сурагч",
+            key: "studentCount",
+            width: 130,
+            render: (_, r: any) => (
+              <Space size={4}>
+                <Tag color={r.studentCount ? "blue" : "default"}>
+                  {r.studentCount ?? 0} сурагч
+                </Tag>
+                {r.pausedStudentCount > 0 && (
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    +{r.pausedStudentCount} завсарласан
+                  </Typography.Text>
+                )}
+              </Space>
+            ),
+          },
+          {
+            title: "Энэ сард",
+            key: "monthAttended",
+            width: 110,
+            render: (_, r: any) => (
+              <Tag color={r.monthAttended ? "green" : "default"}>
+                {r.monthAttended ?? 0} хичээл
+              </Tag>
+            ),
+          },
+          {
             title: "Нэвтрэх эрх",
             key: "canLogin",
             render: (_, r: any) =>

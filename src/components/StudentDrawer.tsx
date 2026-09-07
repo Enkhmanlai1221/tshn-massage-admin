@@ -9,6 +9,8 @@ import {
   Drawer,
   Form,
   Input,
+  InputNumber,
+  DatePicker,
   Select,
   Space,
   Table,
@@ -100,6 +102,144 @@ function ChangeTeacherDrawer({
         </Form.Item>
       </Form>
     </Drawer>
+  );
+}
+
+/**
+ * САРЫН ОРОЛТ — админы гар бүртгэл.
+ *
+ * Өгөгдлийг эхнээс нь гараар оруулахад сурагч бүрийн «орсон N, үүнээс
+ * цалинжсан K»-г админ эндээс тавина. Систем: цалинд орох = N − K −
+ * (олголтод орсон), сарын явц = системд бүртгэгдсэн + өмнөх N.
+ */
+function PriorPanel({ studentId }: { studentId: string }) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const [form] = Form.useForm();
+
+  const { data } = useQuery({
+    queryKey: ["student-prior", studentId],
+    queryFn: async () => (await api.get(`/student/${studentId}/prior`)).data,
+  });
+
+  const save = useMutation({
+    mutationFn: async (v: any) =>
+      api.put(`/student/${studentId}/prior`, {
+        monthKey: v.month ? v.month.format("YYYY-MM") : undefined,
+        count: v.count ?? 0,
+        paidBefore: v.paidBefore ?? 0,
+        note: v.note || undefined,
+      }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      qc.invalidateQueries({ queryKey: ["student-prior", studentId] });
+      qc.invalidateQueries({ queryKey: ["students"] });
+      qc.invalidateQueries({ queryKey: ["student", studentId] });
+    },
+    onError: (e) => message.error(apiError(e)),
+  });
+
+  if (!data) return null;
+  const p = data.progress;
+
+  // Сар сонгоход тухайн сарын хадгалагдсан тоог форм руу татна.
+  const fillMonth = (monthKey: string) => {
+    const hit = (data.priors || []).find((x: any) => x.monthKey === monthKey);
+    form.setFieldsValue({
+      count: hit?.count ?? 0,
+      paidBefore: hit?.paidBefore ?? 0,
+      note: hit?.note ?? undefined,
+    });
+  };
+
+  return (
+    <>
+      <Divider orientation="left" plain>
+        Сарын оролт
+      </Divider>
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Tag color={p.filled ? "green" : "blue"} style={{ fontSize: 13 }}>
+          {data.monthKey}: {p.attended}/{p.quota} оролт
+        </Tag>
+        <Typography.Text type="secondary">
+          системд {p.attendedLessons} + өмнөх {p.prior} · үлдсэн {p.remaining}
+        </Typography.Text>
+        {data.unpaidCount > 0 && (
+          <Tag color="gold">
+            Цалинд орох: {data.unpaidCount} ×{" "}
+            {(data.rate || 0).toLocaleString()}₮ ={" "}
+            {(data.unpaidAmount || 0).toLocaleString()}₮
+          </Tag>
+        )}
+      </Space>
+
+      {(data.priors || []).length > 0 && (
+        <Space wrap size={[4, 4]} style={{ marginBottom: 12, display: "flex" }}>
+          {data.priors.map((r: any) => (
+            <Tag key={r.monthKey}>
+              {r.monthKey}: орсон {r.count} · цалинжсан{" "}
+              {r.paidBefore + r.payoutCount} · цалинд орох {r.unpaid}
+            </Tag>
+          ))}
+        </Space>
+      )}
+
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          month: dayjs(data.monthKey),
+          count:
+            (data.priors || []).find((x: any) => x.monthKey === data.monthKey)
+              ?.count ?? 0,
+          paidBefore:
+            (data.priors || []).find((x: any) => x.monthKey === data.monthKey)
+              ?.paidBefore ?? 0,
+        }}
+        onFinish={(v) => save.mutate(v)}
+      >
+        <Space wrap align="end" size={12}>
+          <Form.Item name="month" label="Сар" style={{ marginBottom: 0 }}>
+            <DatePicker
+              picker="month"
+              allowClear={false}
+              format="YYYY-MM"
+              style={{ width: 110 }}
+              onChange={(d) => d && fillMonth(d.format("YYYY-MM"))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="count"
+            label="Системээс гадуур орсон"
+            tooltip="Тухайн сард системд бүртгэгдээгүй (өмнө нь) орсон нийт хичээл"
+            style={{ marginBottom: 0 }}
+          >
+            <InputNumber min={0} max={60} style={{ width: 70 }} />
+          </Form.Item>
+          <Form.Item
+            name="paidBefore"
+            label="Үүнээс багш цалингаа авсан"
+            tooltip="Гараар аль хэдийн цалинжсан тоо — дараагийн цалинд орохгүй"
+            style={{ marginBottom: 0 }}
+          >
+            <InputNumber min={0} max={60} style={{ width: 70 }} />
+          </Form.Item>
+          <Form.Item name="note" label="Тэмдэглэл" style={{ marginBottom: 0 }}>
+            <Input style={{ width: 140 }} placeholder="сонголттой" />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
+            <Button type="primary" loading={save.isPending} htmlType="submit">
+              Хадгалах
+            </Button>
+          </Form.Item>
+        </Space>
+      </Form>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
+        Ж: орсон 3, цалин авсан 2 → дараагийн цалинд 1 хичээл, сарын явцад 3
+        оролт нэмэгдэнэ. Олголтод орсон тоог систем хамгаалдаг — доош
+        буулгахыг зөвшөөрөхгүй.
+      </Typography.Paragraph>
+    </>
   );
 }
 
@@ -195,6 +335,8 @@ export default function StudentDrawer({
               )}
             </Descriptions.Item>
           </Descriptions>
+
+          <PriorPanel studentId={student._id} />
 
           <Divider orientation="left" plain>
             Хуваарь
