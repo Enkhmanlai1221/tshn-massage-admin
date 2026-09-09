@@ -12,6 +12,8 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
+  Typography,
 } from "antd";
 import dayjs from "dayjs";
 import CrudPage from "@/components/CrudPage";
@@ -21,6 +23,7 @@ import {
   STUDENT_LEVEL_LABEL,
   STUDENT_STATUS_LABEL,
   StudentStatusTag,
+  PaymentStatusTag,
   studentName,
 } from "@/lib/labels";
 
@@ -103,16 +106,28 @@ export default function StudentsPage() {
             render: (_, r: any) => r.phone || r.parentPhone || "—",
           },
           {
-            title: "Энэ сар",
-            key: "month",
-            width: 110,
+            title: "Үлдэгдэл",
+            key: "package",
+            width: 150,
             render: (_, r: any) => {
-              const m = r.month;
-              if (!m) return "—";
+              const pk = r.package;
+              const month = r.month?.attended ?? 0;
+              if (!pk || (pk.paidMonths === 0 && pk.used === 0)) {
+                return <Typography.Text type="secondary">—</Typography.Text>;
+              }
+              // «Үлдсэн» нь БАГЦААС — сарын норм биш (сурагч өөрийн хурдаараа).
               return (
-                <Tag color={m.attended >= m.quota ? "green" : "default"}>
-                  {m.attended}/{m.quota} оролт
-                </Tag>
+                <Tooltip
+                  title={`Багц: ${pk.entitled} оролт (${pk.paidMonths} сар) · ашигласан ${pk.used} · энэ сард ${month}`}
+                >
+                  {pk.balance > 2 ? (
+                    <Tag color="blue">үлдсэн {pk.balance}</Tag>
+                  ) : pk.balance >= 0 ? (
+                    <Tag color="orange">үлдсэн {pk.balance}</Tag>
+                  ) : (
+                    <Tag color="red">{Math.abs(pk.balance)} илүү орсон</Tag>
+                  )}
+                </Tooltip>
               );
             },
           },
@@ -120,12 +135,7 @@ export default function StudentsPage() {
             title: "Төлбөр",
             dataIndex: "lastPaidMonth",
             key: "lastPaidMonth",
-            render: (v) =>
-              v === dayjs().format("YYYY-MM") ? (
-                <Tag color="green">Төлсөн</Tag>
-              ) : (
-                <Tag color="red">Төлөөгүй</Tag>
-              ),
+            render: (v) => <PaymentStatusTag lastPaidMonth={v} />,
           },
           {
             title: "Статус",

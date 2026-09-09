@@ -8,6 +8,7 @@ import {
   Card,
   DatePicker,
   Descriptions,
+  Divider,
   Drawer,
   Popconfirm,
   Space,
@@ -81,82 +82,135 @@ function PreviewDrawer({
     >
       {data && (
         <>
-          <Space size={48} style={{ marginBottom: 16 }}>
-            <Statistic title="Хичээл" value={data.lessonCount} />
-            {data.priorCount > 0 && (
-              <Statistic title="Өмнө орсон" value={data.priorCount} />
-            )}
+          <div>
+            <Typography.Text type="secondary">
+              {from} — {to}
+            </Typography.Text>
+          </div>
+          <Space size={48} style={{ margin: "12px 0 20px" }}>
+            <Statistic title="Цалинд орох оролт" value={data.totalCount} />
             <Statistic
-              title="Нийт"
+              title="Олгох дүн"
               value={data.totalAmount}
               formatter={(v) => money(Number(v))}
+              valueStyle={{ color: "#cf1322" }}
             />
           </Space>
 
-          {/* «Өмнө орсон» хичээл нь Lesson бүртгэлгүй тул доорх хүснэгтэд
-              харагдахгүй — эндээс задаргааг нь харуулна. */}
+          {/*
+            ОГНООГҮЙ оролт — гараар бүртгэсэн, Lesson бичлэггүй. Урьд нь
+            Alert дотор текст мөрүүд болж гардаг байсныг хүснэгт болгов:
+            сурагч, сар, тоо, ханш, дүн нь баганаараа эгнэж уншихад амар.
+          */}
           {data.priorCount > 0 && (
-            <Alert
-              type="warning"
-              style={{ marginBottom: 12 }}
-              message={`Өмнө орсон хичээл: ${data.priorCount} ширхэг, ${money(data.priorAmount)}`}
-              description={
-                <>
-                  <div style={{ marginBottom: 4 }}>
-                    Багш системд бүртгэхээс өмнө заасан, огноогүй хичээлүүд.
-                    Доорх хүснэгтэд ороогүй ч нийт дүнд тооцогдоно.
-                  </div>
-                  {data.priorItems?.map((i: any, n: number) => (
-                    <div key={n}>
-                      {i.studentName} · {i.monthKey} — {i.count} × {money(i.rate)}{" "}
-                      = <b>{money(i.amount)}</b>
-                    </div>
-                  ))}
-                </>
-              }
-            />
+            <>
+              <Divider orientation="left" plain style={{ marginTop: 0 }}>
+                Гараар бүртгэсэн оролт ({data.priorCount})
+              </Divider>
+              <Table
+                size="small"
+                rowKey={(r: any, i) => `${r.student}-${r.monthKey}-${i}`}
+                dataSource={data.priorItems}
+                pagination={false}
+                columns={[
+                  {
+                    title: "Сурагч",
+                    key: "s",
+                    render: (_, r: any) =>
+                      r.firstName ? studentName(r) : r.studentName,
+                  },
+                  { title: "Сар", dataIndex: "monthKey", width: 100 },
+                  {
+                    title: "Оролт",
+                    dataIndex: "count",
+                    width: 80,
+                    align: "right",
+                  },
+                  {
+                    title: "Ханш",
+                    dataIndex: "rate",
+                    width: 100,
+                    align: "right",
+                    render: (v) => money(v),
+                  },
+                  {
+                    title: "Дүн",
+                    dataIndex: "amount",
+                    width: 110,
+                    align: "right",
+                    render: (v) => <b>{money(v)}</b>,
+                  },
+                ]}
+                summary={() => (
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0} colSpan={2}>
+                      <b>Дүн</b>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={2} align="right">
+                      <b>{data.priorCount}</b>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={3} />
+                    <Table.Summary.Cell index={4} align="right">
+                      <b>{money(data.priorAmount)}</b>
+                    </Table.Summary.Cell>
+                  </Table.Summary.Row>
+                )}
+              />
+            </>
           )}
+
+          {/* Огноотой хичээл — байхгүй бол хоосон хүснэгт огт харуулахгүй. */}
+          {data.lessonCount > 0 && (
+            <>
+              <Divider orientation="left" plain>
+                Системд бүртгэгдсэн хичээл ({data.lessonCount})
+              </Divider>
+              <Table
+                size="small"
+                rowKey="_id"
+                dataSource={data.lessons}
+                pagination={{ pageSize: 15, showSizeChanger: false }}
+                columns={[
+                  { title: "Огноо", dataIndex: "date", width: 110 },
+                  {
+                    title: "Цаг",
+                    key: "t",
+                    width: 70,
+                    render: (_, r: any) => minuteLabel(r.startMinute),
+                  },
+                  {
+                    title: "Сурагч",
+                    key: "s",
+                    render: (_, r: any) => studentName(r.student),
+                  },
+                  {
+                    title: "Төлөв",
+                    dataIndex: "status",
+                    render: (v) => <LessonStatusTag status={v} />,
+                  },
+                  {
+                    title: "Дүн",
+                    dataIndex: "rate",
+                    align: "right",
+                    render: (v) => money(v),
+                  },
+                ]}
+              />
+            </>
+          )}
+
           {data.excluded?.length > 0 && (
-            <Alert
-              type="info"
-              style={{ marginBottom: 12 }}
-              message="Цалинд ороогүй хичээл"
-              description={data.excluded
-                .map((e: any) => `${e.label}: ${e.count}`)
+            <Typography.Paragraph
+              type="secondary"
+              style={{ marginTop: 12, marginBottom: 0 }}
+            >
+              Цалинд ороогүй:{" "}
+              {data.excluded
+                .map((e: any) => `${e.label} ${e.count}`)
                 .join(" · ")}
-            />
+              . Товлогдсон хичээл ирц тавигдсаны дараа цалинд орно.
+            </Typography.Paragraph>
           )}
-          <Table
-            size="small"
-            rowKey="_id"
-            dataSource={data.lessons}
-            pagination={{ pageSize: 15, showSizeChanger: false }}
-            columns={[
-              { title: "Огноо", dataIndex: "date", width: 110 },
-              {
-                title: "Цаг",
-                key: "t",
-                width: 70,
-                render: (_, r: any) => minuteLabel(r.startMinute),
-              },
-              {
-                title: "Сурагч",
-                key: "s",
-                render: (_, r: any) => studentName(r.student),
-              },
-              {
-                title: "Төлөв",
-                dataIndex: "status",
-                render: (v) => <LessonStatusTag status={v} />,
-              },
-              {
-                title: "Дүн",
-                dataIndex: "rate",
-                align: "right",
-                render: (v) => money(v),
-              },
-            ]}
-          />
           {can("SALARY", "isWrite") &&
             data.lessonCount + data.priorCount > 0 && (
             <Button

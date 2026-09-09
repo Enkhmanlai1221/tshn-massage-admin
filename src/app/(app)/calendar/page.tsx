@@ -31,10 +31,6 @@ import {
 
 const CELL_H = 46;
 
-/**
- * Календарын үндсэн харагдац — ӨДӨР × ӨРӨӨ.
- * Мөр нь цаг, багана нь өрөө. Хичээлийг чирж зөөнө (HTML5 drag & drop).
- */
 export default function CalendarPage() {
   const { message } = App.useApp();
   const { can } = useAuth();

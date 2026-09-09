@@ -1,4 +1,5 @@
 import { Tag } from "antd";
+import dayjs from "dayjs";
 
 /** Хичээлийн төлөв — монгол шошго + өнгө (backend-ийн LESSON.ts-тэй нэг эх сурвалж). */
 export const LESSON_STATUS_LABEL: Record<string, string> = {
@@ -120,5 +121,30 @@ export function StudentStatusTag({ status }: { status?: string }) {
   );
 }
 
-export const studentName = (s: any) =>
-  s ? [s.lastName, s.firstName].filter(Boolean).join(" ") : "—";
+/** «Б.Ану» — овгийн эхний үсэг + нэр. Овоггүй сурагчид зөвхөн нэр. */
+export const studentName = (s: any) => {
+  if (!s) return "—";
+  const initial = s.lastName ? `${s.lastName[0]}.` : "";
+  return `${initial}${s.firstName ?? ""}`.trim() || "—";
+};
+
+/**
+ * ТӨЛБӨРИЙН ШОШГО — урьдчилгааг зөв харуулна.
+ *
+ * Сурагч 2-3 сараар урьдчилж төлдөг тул `lastPaidMonth`-ыг ЗӨВХӨН энэ сартай
+ * тэнцүү эсэхээр шалгавал урьдчилж төлсөн сурагч «Төлөөгүй» гэж улаанаар
+ * гарч, админ дахин нэхэмжилнэ. Тиймээс харьцуулалт нь `>=`.
+ */
+export function PaymentStatusTag({
+  lastPaidMonth,
+}: {
+  lastPaidMonth?: string | null;
+}) {
+  const current = dayjs().format("YYYY-MM");
+  if (!lastPaidMonth) return <Tag color="red">Төлөөгүй</Tag>;
+  if (lastPaidMonth < current) {
+    return <Tag color="red">Төлөөгүй · сүүлд {lastPaidMonth}</Tag>;
+  }
+  if (lastPaidMonth === current) return <Tag color="green">Төлсөн</Tag>;
+  return <Tag color="blue">{lastPaidMonth} хүртэл төлсөн</Tag>;
+}

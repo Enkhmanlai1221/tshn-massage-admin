@@ -12,11 +12,13 @@ import {
   Switch,
   Tag,
   Space,
+  Tooltip,
   Typography,
 } from "antd";
 import { KeyOutlined } from "@ant-design/icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import CrudPage from "@/components/CrudPage";
+import TeacherSalaryDrawer from "@/components/TeacherSalaryDrawer";
 import { api, apiError } from "@/lib/api";
 import { useInstruments } from "@/lib/hooks";
 import { useAuth } from "@/lib/auth";
@@ -85,6 +87,7 @@ export default function TeachersPage() {
   const { data: instruments } = useInstruments();
   const { can } = useAuth();
   const [pwTeacher, setPwTeacher] = useState<any | null>(null);
+  const [salaryTeacher, setSalaryTeacher] = useState<string | null>(null);
 
   const options = (instruments || []).map((i: any) => ({
     value: i._id,
@@ -99,7 +102,14 @@ export default function TeachersPage() {
         permission="TEACHER"
         queryKey="teachers"
         columns={[
-          { title: "Нэр", dataIndex: "name", key: "name" },
+          {
+            title: "Нэр",
+            dataIndex: "name",
+            key: "name",
+            render: (v, r: any) => (
+              <a onClick={() => setSalaryTeacher(r._id)}>{v}</a>
+            ),
+          },
           { title: "Утас", dataIndex: "phone", key: "phone" },
           {
             title: "Хөгжим",
@@ -114,14 +124,16 @@ export default function TeachersPage() {
             key: "studentCount",
             width: 130,
             render: (_, r: any) => (
-              <Space size={4}>
+              <Space size={4} wrap={false}>
                 <Tag color={r.studentCount ? "blue" : "default"}>
                   {r.studentCount ?? 0} сурагч
                 </Tag>
                 {r.pausedStudentCount > 0 && (
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    +{r.pausedStudentCount} завсарласан
-                  </Typography.Text>
+                  <Tooltip
+                    title={`${r.pausedStudentCount} сурагч завсарласан`}
+                  >
+                    <Tag>+{r.pausedStudentCount}</Tag>
+                  </Tooltip>
                 )}
               </Space>
             ),
@@ -131,9 +143,11 @@ export default function TeachersPage() {
             key: "monthAttended",
             width: 110,
             render: (_, r: any) => (
-              <Tag color={r.monthAttended ? "green" : "default"}>
-                {r.monthAttended ?? 0} хичээл
-              </Tag>
+              <a onClick={() => setSalaryTeacher(r._id)}>
+                <Tag color={r.monthAttended ? "green" : "default"}>
+                  {r.monthAttended ?? 0} оролт
+                </Tag>
+              </a>
             ),
           },
           {
@@ -241,6 +255,10 @@ export default function TeachersPage() {
         )}
       />
       <PasswordDrawer teacher={pwTeacher} onClose={() => setPwTeacher(null)} />
+      <TeacherSalaryDrawer
+        teacherId={salaryTeacher}
+        onClose={() => setSalaryTeacher(null)}
+      />
     </>
   );
 }

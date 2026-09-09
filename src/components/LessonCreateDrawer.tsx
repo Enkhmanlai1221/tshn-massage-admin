@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { App, Alert, Button, Drawer, Form, Select, Space, Typography } from "antd";
+import {
+  App,
+  Alert,
+  Button,
+  Drawer,
+  Form,
+  Select,
+  Space,
+  Typography,
+} from "antd";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import { studentName } from "@/lib/labels";
@@ -14,10 +23,6 @@ export interface CreateTarget {
   slotLabel?: string;
 }
 
-/**
- * Календарын хоосон нүд дээр дарж хичээл нэмнэ. Өрөө/цаг нь дарсан нүднээс
- * автоматаар ирнэ — админ зөвхөн сурагчаа сонгоно.
- */
 export default function LessonCreateDrawer({
   target,
   onClose,
@@ -98,11 +103,7 @@ export default function LessonCreateDrawer({
           <Typography.Paragraph>
             <b>{target.date}</b> · {target.slotLabel} · {target.roomName}
           </Typography.Paragraph>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={(v) => save.mutate(v)}
-          >
+          <Form form={form} layout="vertical" onFinish={(v) => save.mutate(v)}>
             <Form.Item
               name="student"
               label="Сурагч"

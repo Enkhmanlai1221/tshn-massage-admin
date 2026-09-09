@@ -56,17 +56,25 @@ interface Available {
 const onlyDigits = (v: string) => (v || "").replace(/\D/g, "").slice(0, 8);
 
 /**
- * «4/8 оролт» — сарын явцын нимгэн зурвас.
+ * ТӨЛСӨН ОРОЛТЫН ҮЛДЭГДЭЛ — нимгэн зурвас.
  *
- * Өнгөний дэглэм: дүүрсэн бол ногоон, хоцорч байвал (25%-аас бага) шар
- * анхааруулга, бусад нь саарал — ягаан зөвхөн дарж болох зүйлд үлдэнэ.
+ * Сурагч төлбөрөө өөрийн хурдаараа зарцуулдаг (8 сарын 8 оролтоо 8 сард 6,
+ * 9 сард 2 гэж дуусгаж болно) тул «энэ сард X/8» гэдэг нь ХУДАЛ амлалт өгдөг
+ * байв. Тиймээс хэмжүүр нь БАГЦ: төлсөн эрхээс хэд үлдсэн бэ.
+ *
+ * Өнгө: үлдэгдэл бага (≤2) бол шар анхааруулга, дууссан/хэтэрсэн бол улаан.
  */
-function MonthBar({ month }: { month?: any }) {
-  if (!month) return null;
-  const { attended = 0, quota = 8 } = month;
-  const done = attended >= quota;
-  const low = !done && attended / quota < 0.25;
-  const color = done ? "#16a34a" : low ? "#d97706" : "#6b7280";
+function MonthBar({ month, pkg }: { month?: any; pkg?: any }) {
+  const attended = month?.attended ?? 0;
+  // Төлбөр ч, оролт ч бүртгэгдээгүй бол харуулах зүйлгүй.
+  if (!pkg || (pkg.paidMonths === 0 && pkg.used === 0)) return null;
+
+  const { entitled = 0, used = 0, balance = 0 } = pkg;
+  const over = balance < 0;
+  const low = !over && balance <= 2;
+  const color = over ? "#dc2626" : low ? "#d97706" : "#16a34a";
+  const percent = entitled ? Math.min(100, Math.round((used / entitled) * 100)) : 100;
+
   return (
     <div
       style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}
@@ -82,7 +90,7 @@ function MonthBar({ month }: { month?: any }) {
       >
         <div
           style={{
-            width: `${Math.min(100, Math.round((attended / quota) * 100))}%`,
+            width: `${percent}%`,
             height: "100%",
             background: color,
             borderRadius: 3,
@@ -92,12 +100,22 @@ function MonthBar({ month }: { month?: any }) {
       <div
         style={{
           fontSize: 12,
-          color: low ? "#b45309" : "#4b5563",
+          color: over || low ? "#b45309" : "#4b5563",
           flexShrink: 0,
         }}
       >
-        Энэ сар <b style={{ color: low ? "#b45309" : "#111827" }}>{attended}</b>
-        /{quota} оролт
+        {over ? (
+          <>
+            Төлбөр хэтэрсэн{" "}
+            <b style={{ color: "#b45309" }}>{Math.abs(balance)}</b>
+          </>
+        ) : (
+          <>
+            Үлдсэн{" "}
+            <b style={{ color: low ? "#b45309" : "#111827" }}>{balance}</b> оролт
+            <span style={{ color: "#9ca3af" }}> · энэ сард {attended}</span>
+          </>
+        )}
       </div>
     </div>
   );
@@ -721,7 +739,6 @@ function BookLesson({ studentId }: { studentId: string }) {
         <div
           style={{
             display: "grid",
-            // 375px дэлгэцэд 2 багана багтана (Drawer + карт padding хассаны дараа ~300px).
             gridTemplateColumns: "repeat(auto-fill, minmax(128px, 1fr))",
             gap: 8,
           }}
@@ -782,13 +799,6 @@ function LessonRow({
   );
 }
 
-/**
- * Сурагчийн хуудас.
- *
- * Гурван ажил (ирц бүртгэх / хичээл товлох / түүх харах) нь ТАБААР салсан —
- * өмнө нь гурвуулаа нэг доор дараалж, аль товч аль блокт хамаарахыг ялгахад
- * хэцүү байв. Одоо нэг мөчид ганц ажил харагдана.
- */
 function StudentSheet({
   id,
   onClose,
@@ -1151,7 +1161,7 @@ export default function TeacherStudentsPage() {
                     ›
                   </div>
                 </div>
-                <MonthBar month={s.month} />
+                <MonthBar month={s.month} pkg={s.package} />
               </div>
             );
           })}

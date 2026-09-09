@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Alert,
   App,
   Button,
   Descriptions,
@@ -19,7 +20,7 @@ import {
 } from "antd";
 import { SwapOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import dayjs, { Dayjs } from "dayjs";
 import { api, apiError } from "@/lib/api";
 import { useTeachers } from "@/lib/hooks";
 import {
@@ -27,9 +28,18 @@ import {
   LessonStatusTag,
   STUDENT_LEVEL_LABEL,
   StudentStatusTag,
+  PaymentStatusTag,
   studentName,
+  money,
 } from "@/lib/labels";
 import EnrollmentPanel from "./EnrollmentPanel";
+
+/** Нэг сарын оролтын бүртгэл (хадгалаагүй засварыг ч агуулна). */
+interface Row {
+  monthKey: string;
+  count: number;
+  paidBefore: number;
+}
 
 /** Багш солих — түүх хадгалагдана (хуучин бичлэг хаагдаж шинэ нээгдэнэ). */
 function ChangeTeacherDrawer({
@@ -115,129 +125,284 @@ function ChangeTeacherDrawer({
 function PriorPanel({ studentId }: { studentId: string }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [form] = Form.useForm();
+
+  /** Хадгалаагүй засварууд — сар бүрээр. */
+  const [draft, setDraft] = useState<Record<string, Row> | null>(null);
+  const [payFrom, setPayFrom] = useState<Dayjs>(dayjs());
+  const [payMonths, setPayMonths] = useState<number>(1);
 
   const { data } = useQuery({
     queryKey: ["student-prior", studentId],
     queryFn: async () => (await api.get(`/student/${studentId}/prior`)).data,
   });
 
-  const save = useMutation({
-    mutationFn: async (v: any) =>
-      api.put(`/student/${studentId}/prior`, {
-        monthKey: v.month ? v.month.format("YYYY-MM") : undefined,
-        count: v.count ?? 0,
-        paidBefore: v.paidBefore ?? 0,
-        note: v.note || undefined,
+  const refresh = () => {
+    setDraft(null);
+    qc.invalidateQueries({ queryKey: ["student-prior", studentId] });
+    qc.invalidateQueries({ queryKey: ["students"] });
+    qc.invalidateQueries({ queryKey: ["student", studentId] });
+    qc.invalidateQueries({ queryKey: ["payments"] });
+    qc.invalidateQueries({ queryKey: ["teacher-salary-sheet"] });
+  };
+
+  const saveMonths = useMutation({
+    mutationFn: async (months: Row[]) =>
+      api.put(`/student/${studentId}/prior/bulk`, { months }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      refresh();
+    },
+    onError: (e) => message.error(apiError(e)),
+  });
+
+  const savePayment = useMutation({
+    mutationFn: async () =>
+      api.post(`/payment/${studentId}`, {
+        monthKey: payFrom.format("YYYY-MM"),
+        status: "PAID",
+        months: payMonths,
       }),
     onSuccess: (res) => {
       message.success(res.data.message);
-      qc.invalidateQueries({ queryKey: ["student-prior", studentId] });
-      qc.invalidateQueries({ queryKey: ["students"] });
-      qc.invalidateQueries({ queryKey: ["student", studentId] });
+      refresh();
     },
     onError: (e) => message.error(apiError(e)),
   });
 
   if (!data) return null;
   const p = data.progress;
+  const pkg = data.package;
 
-  // Сар сонгоход тухайн сарын хадгалагдсан тоог форм руу татна.
-  const fillMonth = (monthKey: string) => {
-    const hit = (data.priors || []).find((x: any) => x.monthKey === monthKey);
-    form.setFieldsValue({
-      count: hit?.count ?? 0,
-      paidBefore: hit?.paidBefore ?? 0,
-      note: hit?.note ?? undefined,
+  // Сервер дээрх мөрүүд + хадгалаагүй засварууд.
+  const rows: Row[] = Object.values(
+    draft ??
+      Object.fromEntries(
+        (data.priors || []).map((r: any) => [
+          r.monthKey,
+          { monthKey: r.monthKey, count: r.count, paidBefore: r.paidBefore },
+        ]),
+      ),
+  );
+  rows.sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+  const edit = (monthKey: string, patch: Partial<Row>) =>
+    setDraft((d) => {
+      const base =
+        d ??
+        Object.fromEntries(
+          (data.priors || []).map((r: any) => [
+            r.monthKey,
+            { monthKey: r.monthKey, count: r.count, paidBefore: r.paidBefore },
+          ]),
+        );
+      return { ...base, [monthKey]: { ...base[monthKey], ...patch } };
+    });
+
+  /** Жагсаалтад байхгүй хамгийн ойрын өмнөх сарыг нэмнэ. */
+  const addMonth = () => {
+    const taken = new Set(rows.map((r) => r.monthKey));
+    let candidate = dayjs();
+    for (let i = 0; i < 36 && taken.has(candidate.format("YYYY-MM")); i++) {
+      candidate = candidate.subtract(1, "month");
+    }
+    edit(candidate.format("YYYY-MM"), {
+      monthKey: candidate.format("YYYY-MM"),
+      count: 0,
+      paidBefore: 0,
     });
   };
+
+  const dirty = draft !== null;
+  const busy = saveMonths.isPending || savePayment.isPending;
 
   return (
     <>
       <Divider orientation="left" plain>
-        Сарын оролт
+        Төлбөр ба оролт
       </Divider>
-      <Space wrap style={{ marginBottom: 12 }}>
-        <Tag color={p.filled ? "green" : "blue"} style={{ fontSize: 13 }}>
-          {data.monthKey}: {p.attended}/{p.quota} оролт
+
+      {pkg && pkg.paidMonths > 0 && (
+        <Alert
+          type={pkg.balance < 0 ? "warning" : "info"}
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            <Space wrap>
+              <b>
+                Багц: {pkg.entitled} оролт ({pkg.paidMonths} сар × {data.quota})
+              </b>
+              <Tag color="green">орсон {pkg.used}</Tag>
+              {pkg.balance >= 0 ? (
+                <Tag color="blue">үлдсэн {pkg.balance}</Tag>
+              ) : (
+                <Tag color="red">
+                  төлснөөс {Math.abs(pkg.balance)} оролт илүү орсон
+                </Tag>
+              )}
+            </Space>
+          }
+          description={
+            pkg.usedLessons > 0 && pkg.usedPrior > 0
+              ? `Ашигласан: системд ${pkg.usedLessons} + гараар ${pkg.usedPrior}`
+              : undefined
+          }
+        />
+      )}
+
+      {/* 1. Хэдэн сарын төлбөр авсныг нэг дор тэмдэглэнэ. */}
+      <Space wrap align="end" size={8} style={{ marginBottom: 16 }}>
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Төлбөр: эхлэх сар
+          </Typography.Text>
+          <br />
+          <DatePicker
+            picker="month"
+            value={payFrom}
+            onChange={(v) => v && setPayFrom(v)}
+            allowClear={false}
+            format="YYYY-MM"
+            style={{ width: 120 }}
+          />
+        </div>
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            хэдэн сар
+          </Typography.Text>
+          <br />
+          <InputNumber
+            min={1}
+            max={12}
+            value={payMonths}
+            onChange={(v) => setPayMonths(Number(v) || 1)}
+            style={{ width: 70 }}
+          />
+        </div>
+        <Button
+          onClick={() => savePayment.mutate()}
+          loading={savePayment.isPending}
+          disabled={busy}
+        >
+          Төлсөн гэж тэмдэглэх
+        </Button>
+        <Typography.Text type="secondary">
+          = {payMonths * data.quota} оролтын эрх
+        </Typography.Text>
+      </Space>
+
+      {/* 2. Өнгөрсөн оролтыг сар бүрээр — бүгдийг нэг хадгалалтаар. */}
+      <Table
+        size="small"
+        rowKey="monthKey"
+        dataSource={rows}
+        pagination={false}
+        locale={{ emptyText: "Оролтын бүртгэл алга — «Сар нэмэх» дарна уу." }}
+        columns={[
+          { title: "Сар", dataIndex: "monthKey", width: 100 },
+          {
+            title: "Орсон оролт",
+            key: "count",
+            width: 120,
+            render: (_, r: Row) => (
+              <InputNumber
+                size="small"
+                min={0}
+                max={60}
+                style={{ width: 70 }}
+                value={r.count}
+                disabled={busy}
+                onChange={(v) =>
+                  edit(r.monthKey, { count: Number(v ?? 0) })
+                }
+              />
+            ),
+          },
+          {
+            title: "Цалингаа авсан",
+            key: "paidBefore",
+            width: 140,
+            render: (_, r: Row) => (
+              <InputNumber
+                size="small"
+                min={0}
+                max={r.count}
+                style={{ width: 70 }}
+                value={r.paidBefore}
+                disabled={busy}
+                onChange={(v) =>
+                  edit(r.monthKey, { paidBefore: Number(v ?? 0) })
+                }
+              />
+            ),
+          },
+          {
+            title: "Цалинд орох",
+            key: "unpaid",
+            render: (_, r: Row) => {
+              const saved = (data.priors || []).find(
+                (x: any) => x.monthKey === r.monthKey,
+              );
+              const payout = saved?.payoutCount ?? 0;
+              const unpaid = Math.max(0, r.count - r.paidBefore - payout);
+              return unpaid ? (
+                <Space size={4}>
+                  <Tag color="gold">{unpaid} оролт</Tag>
+                  <Typography.Text type="secondary">
+                    {money(unpaid * data.rate)}
+                  </Typography.Text>
+                </Space>
+              ) : (
+                <Typography.Text type="secondary">—</Typography.Text>
+              );
+            },
+          },
+        ]}
+      />
+
+      <Space style={{ marginTop: 12 }} wrap>
+        <Button onClick={addMonth} disabled={busy}>
+          + Сар нэмэх
+        </Button>
+        <Button
+          type="primary"
+          disabled={!dirty || busy}
+          loading={saveMonths.isPending}
+          onClick={() => saveMonths.mutate(rows)}
+        >
+          Хадгалах
+        </Button>
+        {dirty && (
+          <>
+            <Button onClick={() => setDraft(null)} disabled={busy}>
+              Болих
+            </Button>
+            <Typography.Text type="warning">
+              Хадгалаагүй засвар байна
+            </Typography.Text>
+          </>
+        )}
+      </Space>
+
+      <Space wrap style={{ marginTop: 12 }}>
+        <Tag>
+          {data.monthKey}-д орсон: {p.attended}
         </Tag>
         <Typography.Text type="secondary">
-          системд {p.attendedLessons} + өмнөх {p.prior} · үлдсэн {p.remaining}
+          системд {p.attendedLessons} + гараар {p.prior}
+          {p.absent > 0 && ` · тасалсан ${p.absent}`}
         </Typography.Text>
         {data.unpaidCount > 0 && (
           <Tag color="gold">
-            Цалинд орох: {data.unpaidCount} ×{" "}
-            {(data.rate || 0).toLocaleString()}₮ ={" "}
-            {(data.unpaidAmount || 0).toLocaleString()}₮
+            Багшид олгох: {data.unpaidCount} оролт ={" "}
+            {money(data.unpaidAmount)}
           </Tag>
         )}
       </Space>
 
-      {(data.priors || []).length > 0 && (
-        <Space wrap size={[4, 4]} style={{ marginBottom: 12, display: "flex" }}>
-          {data.priors.map((r: any) => (
-            <Tag key={r.monthKey}>
-              {r.monthKey}: орсон {r.count} · цалинжсан{" "}
-              {r.paidBefore + r.payoutCount} · цалинд орох {r.unpaid}
-            </Tag>
-          ))}
-        </Space>
-      )}
-
-      <Form
-        form={form}
-        layout="vertical"
-        initialValues={{
-          month: dayjs(data.monthKey),
-          count:
-            (data.priors || []).find((x: any) => x.monthKey === data.monthKey)
-              ?.count ?? 0,
-          paidBefore:
-            (data.priors || []).find((x: any) => x.monthKey === data.monthKey)
-              ?.paidBefore ?? 0,
-        }}
-        onFinish={(v) => save.mutate(v)}
-      >
-        <Space wrap align="end" size={12}>
-          <Form.Item name="month" label="Сар" style={{ marginBottom: 0 }}>
-            <DatePicker
-              picker="month"
-              allowClear={false}
-              format="YYYY-MM"
-              style={{ width: 110 }}
-              onChange={(d) => d && fillMonth(d.format("YYYY-MM"))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="count"
-            label="Системээс гадуур орсон"
-            tooltip="Тухайн сард системд бүртгэгдээгүй (өмнө нь) орсон нийт хичээл"
-            style={{ marginBottom: 0 }}
-          >
-            <InputNumber min={0} max={60} style={{ width: 70 }} />
-          </Form.Item>
-          <Form.Item
-            name="paidBefore"
-            label="Үүнээс багш цалингаа авсан"
-            tooltip="Гараар аль хэдийн цалинжсан тоо — дараагийн цалинд орохгүй"
-            style={{ marginBottom: 0 }}
-          >
-            <InputNumber min={0} max={60} style={{ width: 70 }} />
-          </Form.Item>
-          <Form.Item name="note" label="Тэмдэглэл" style={{ marginBottom: 0 }}>
-            <Input style={{ width: 140 }} placeholder="сонголттой" />
-          </Form.Item>
-          <Form.Item style={{ marginBottom: 0 }}>
-            <Button type="primary" loading={save.isPending} htmlType="submit">
-              Хадгалах
-            </Button>
-          </Form.Item>
-        </Space>
-      </Form>
       <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
-        Ж: орсон 3, цалин авсан 2 → дараагийн цалинд 1 хичээл, сарын явцад 3
-        оролт нэмэгдэнэ. Олголтод орсон тоог систем хамгаалдаг — доош
-        буулгахыг зөвшөөрөхгүй.
+        Оролтыг болсон САРУУДАД нь хуваарилж бичнэ (нэг сард 34 гэх мэт бөөнөөр
+        бичвэл тухайн сар нормоос хэтэрч, буруу анхааруулга өгнө). «Цалингаа
+        авсан» нь багшид аль хэдийн олгосон оролтын тоо — үлдсэн нь цалинд орно.
       </Typography.Paragraph>
     </>
   );
@@ -329,10 +494,8 @@ export default function StudentDrawer({
             <Descriptions.Item label="Эцэг эхийн утас">
               {student.parentPhone || "—"}
             </Descriptions.Item>
-            <Descriptions.Item label="Сүүлд төлсөн сар" span={2}>
-              {student.lastPaidMonth || (
-                <Typography.Text type="danger">Төлөөгүй</Typography.Text>
-              )}
+            <Descriptions.Item label="Төлбөр" span={2}>
+              <PaymentStatusTag lastPaidMonth={student.lastPaidMonth} />
             </Descriptions.Item>
           </Descriptions>
 

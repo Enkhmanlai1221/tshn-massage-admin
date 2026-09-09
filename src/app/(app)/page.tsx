@@ -14,6 +14,7 @@ import {
   Statistic,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from "antd";
 import { WarningOutlined } from "@ant-design/icons";
@@ -22,7 +23,7 @@ import dayjs from "dayjs";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import StudentDrawer from "@/components/StudentDrawer";
-import { studentName, money } from "@/lib/labels";
+import { studentName, money, PaymentStatusTag } from "@/lib/labels";
 
 /**
  * Сургуулийн хэмжээний сарын нэгтгэл — «бүх сурагчийн оролт нийлээд хэд вэ».
@@ -78,18 +79,40 @@ function SummaryRow() {
       </Col>
       <Col xs={12} sm={8} lg={5}>
         <Card size="small">
+          {/*
+            Зарагдсан оролтын үлдэгдэл — сарын норм БИШ. Сурагч төлбөрөө
+            өөрийн хурдаараа зарцуулдаг тул «энэ сард X/448» гэдэг нь
+            биелэх ёсгүй амлалт өгдөг байв.
+          */}
           <Statistic
-            title={`Сарын оролт (${s.monthKey})`}
-            value={s.attended}
-            suffix={`/ ${s.totalQuota}`}
+            title="Төлсөн оролтын үлдэгдэл"
+            value={s.package?.remaining ?? 0}
+            suffix={
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                / {s.package?.entitled ?? 0} зарагдсан
+              </Typography.Text>
+            }
           />
           <Progress
-            percent={s.fillPercent}
+            percent={s.package?.usedPercent ?? 0}
             size="small"
             style={{ marginBottom: 0 }}
           />
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            системд {s.attendedLessons} + өмнөх {s.prior}
+            ашигласан {s.package?.used ?? 0}
+            {s.package?.overdrawn > 0 &&
+              ` · ${s.package.overdrawn} сурагч хэтэрсэн`}
+          </Typography.Text>
+        </Card>
+      </Col>
+      <Col xs={12} sm={8} lg={4}>
+        <Card size="small">
+          <Statistic
+            title={`${s.monthKey}-д орсон`}
+            value={s.attended}
+          />
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            системд {s.attendedLessons} + гараар {s.prior}
           </Typography.Text>
         </Card>
       </Col>
@@ -147,7 +170,7 @@ export default function DashboardPage() {
   });
 
   const rows: any[] = data?.rows || [];
-  const finished = rows.filter((r) => (r.month?.remaining ?? 0) === 0).length;
+  const finished = rows.filter((r) => (r.package?.balance ?? 0) <= 0).length;
 
   return (
     <div>
@@ -168,7 +191,7 @@ export default function DashboardPage() {
           type="success"
           showIcon
           message="Оролт дуусах гэж буй сурагч алга"
-          description={`Энэ сард (${data?.monthKey}) бүх идэвхтэй сурагчийн оролт хэвийн байна.`}
+          description="Бүх сурагчийн төлсөн оролтын үлдэгдэл хангалттай байна."
         />
       ) : (
         <>
@@ -179,9 +202,9 @@ export default function DashboardPage() {
             style={{ marginBottom: 12 }}
             message={`${rows.length} сурагчийн оролт дуусах гэж байна`}
             description={
-              `Энэ сарын ${data?.quota} оролтын нормд ${data?.threshold} ба түүнээс цөөн оролт үлдсэн` +
+              `Төлсөн төлбөрөөрөө авсан оролтоос ${data?.threshold} ба түүнээс цөөн үлдсэн` +
               (finished ? `, үүнээс ${finished} нь бүрэн дууссан` : "") +
-              ". Хуваарийг сунгаж, дараагийн төлбөрийг шийдвэрлэнэ үү."
+              ". Дараагийн төлбөрийг авах цаг болжээ."
             }
             action={
               <Button size="small" onClick={() => router.push("/students")}>
@@ -225,44 +248,55 @@ export default function DashboardPage() {
                 render: (_, r: any) => r.phone || r.parentPhone || "—",
               },
               {
-                title: "Энэ сар",
-                key: "month",
-                width: 130,
+                title: "Багц",
+                key: "package",
+                width: 150,
                 render: (_, r: any) => {
-                  const m = r.month;
-                  if (!m) return "—";
+                  const pk = r.package;
+                  if (!pk) return "—";
+                  if (pk.entitled === 0) {
+                    return (
+                      <Tooltip title="Төлбөрийн бүртгэл алга — оруулна уу">
+                        <Tag color="red">төлбөр бүртгээгүй</Tag>
+                      </Tooltip>
+                    );
+                  }
                   return (
-                    <Tag color={m.remaining === 0 ? "red" : "orange"}>
-                      {m.attended}/{m.quota} оролт
-                    </Tag>
+                    <Tooltip
+                      title={`${pk.paidMonths} сар төлсөн = ${pk.entitled} оролт`}
+                    >
+                      <Tag>
+                        {pk.used}/{pk.entitled} ашигласан
+                      </Tag>
+                    </Tooltip>
                   );
                 },
               },
               {
                 title: "Үлдсэн",
                 key: "remaining",
-                width: 100,
+                width: 120,
                 render: (_, r: any) => {
-                  const rem = r.month?.remaining ?? 0;
-                  return rem === 0 ? (
+                  const b = r.package?.balance ?? 0;
+                  if (b < 0) {
+                    return <Tag color="red">{Math.abs(b)} илүү орсон</Tag>;
+                  }
+                  return b === 0 ? (
                     <Tag color="red">Дууссан</Tag>
                   ) : (
-                    <Tag color="orange">{rem} оролт</Tag>
+                    <Tag color="orange">{b} оролт</Tag>
                   );
                 },
               },
               {
                 title: "Цааш товлогдсон",
                 key: "upcoming",
-                width: 170,
+                width: 120,
                 render: (_, r: any) =>
                   r.upcomingScheduled ? (
-                    <Space size={4}>
+                    <Tooltip title={`${r.lastScheduledDate} хүртэл товлогдсон`}>
                       <Tag>{r.upcomingScheduled} хичээл</Tag>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {r.lastScheduledDate} хүртэл
-                      </Typography.Text>
-                    </Space>
+                    </Tooltip>
                   ) : (
                     <Tag color="red">Товлогдоогүй</Tag>
                   ),
@@ -271,13 +305,8 @@ export default function DashboardPage() {
                 title: "Төлбөр",
                 dataIndex: "lastPaidMonth",
                 key: "lastPaidMonth",
-                width: 100,
-                render: (v) =>
-                  v === dayjs().format("YYYY-MM") ? (
-                    <Tag color="green">Төлсөн</Tag>
-                  ) : (
-                    <Tag color="red">Төлөөгүй</Tag>
-                  ),
+                width: 150,
+                render: (v) => <PaymentStatusTag lastPaidMonth={v} />,
               },
             ]}
           />

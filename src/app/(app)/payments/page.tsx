@@ -3,8 +3,10 @@
 import { useState } from "react";
 import {
   App,
+  Button,
   Card,
   DatePicker,
+  Dropdown,
   Select,
   Space,
   Statistic,
@@ -13,6 +15,7 @@ import {
   Tag,
   Typography,
 } from "antd";
+import { DownOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import { api, apiError } from "@/lib/api";
@@ -20,9 +23,15 @@ import { useAuth } from "@/lib/auth";
 import { useTeachers } from "@/lib/hooks";
 import { studentName } from "@/lib/labels";
 
+/** Урьдчилж төлөх боломжит сарын тоо. */
+const ADVANCE_OPTIONS = [2, 3, 6, 12];
+
 /**
- * Сурагчийн сарын төлбөр — зөвхөн "төлсөн / төлөөгүй" төлөв.
- * Дүн, өр тооцохгүй (тохирсны дагуу).
+ * Сурагчийн сарын төлбөр — зөвхөн "төлсөн / төлөөгүй" төлөв (дүн тооцохгүй).
+ *
+ * Зарим сурагч 2-3 сараар урьдчилж төлдөг тул нэг товшилтоор олон сарыг
+ * тэмдэглэх боломжтой: «Олон сар» → 3 сар гэвэл сонгосон сараас эхлэн
+ * гурван сар PAID болно. «Төлсөн хүртэл» багана нь урьдчилгааг харуулна.
  */
 export default function PaymentsPage() {
   const { message } = App.useApp();
@@ -42,11 +51,16 @@ export default function PaymentsPage() {
         .data,
   });
 
-  const toggle = useMutation({
-    mutationFn: async (p: { student: string; paid: boolean }) =>
+  const mark = useMutation({
+    mutationFn: async (p: {
+      student: string;
+      paid: boolean;
+      months?: number;
+    }) =>
       api.post(`/payment/${p.student}`, {
         monthKey,
         status: p.paid ? "PAID" : "UNPAID",
+        months: p.months ?? 1,
       }),
     onSuccess: (res) => {
       message.success(res.data.message);
@@ -105,6 +119,11 @@ export default function PaymentsPage() {
               value={data?.unpaid ?? 0}
               valueStyle={{ color: "#ef4444" }}
             />
+            <Statistic
+              title="Урьдчилсан"
+              value={data?.advance ?? 0}
+              valueStyle={{ color: "#3b82f6" }}
+            />
           </Space>
         </div>
 
@@ -147,9 +166,9 @@ export default function PaymentsPage() {
                 <Space>
                   <Switch
                     checked={r.status === "PAID"}
-                    disabled={!canApprove || toggle.isPending}
+                    disabled={!canApprove || mark.isPending}
                     onChange={(v) =>
-                      toggle.mutate({ student: r.student._id, paid: v })
+                      mark.mutate({ student: r.student._id, paid: v })
                     }
                   />
                   <Tag color={r.status === "PAID" ? "green" : "red"}>
@@ -158,8 +177,69 @@ export default function PaymentsPage() {
                 </Space>
               ),
             },
+            {
+              title: "Төлсөн хүртэл",
+              key: "paidThrough",
+              width: 230,
+              render: (_, r: any) => (
+                <Space>
+                  {r.advanceMonths > 0 ? (
+                    <Tag color="blue">
+                      {r.paidThrough} хүртэл · +{r.advanceMonths} сар
+                    </Tag>
+                  ) : (
+                    <Typography.Text type="secondary">—</Typography.Text>
+                  )}
+                  {canApprove && (
+                    <Dropdown
+                      disabled={mark.isPending}
+                      menu={{
+                        items: [
+                          ...ADVANCE_OPTIONS.map((n) => ({
+                            key: String(n),
+                            label: `${n} сарын төлбөр авсан`,
+                          })),
+                          ...(r.advanceMonths > 0
+                            ? [
+                                { type: "divider" as const },
+                                {
+                                  key: "undo",
+                                  danger: true,
+                                  label: `Урьдчилгааг цуцлах (${
+                                    r.advanceMonths + 1
+                                  } сар)`,
+                                },
+                              ]
+                            : []),
+                        ],
+                        onClick: ({ key }) =>
+                          key === "undo"
+                            ? mark.mutate({
+                                student: r.student._id,
+                                paid: false,
+                                months: r.advanceMonths + 1,
+                              })
+                            : mark.mutate({
+                                student: r.student._id,
+                                paid: true,
+                                months: Number(key),
+                              }),
+                      }}
+                    >
+                      <Button size="small">
+                        Олон сар <DownOutlined />
+                      </Button>
+                    </Dropdown>
+                  )}
+                </Space>
+              ),
+            },
           ]}
         />
+        <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
+          «Олон сар» нь сонгосон сараас эхлэн тэр тооны сарыг нэг дор
+          баталгаажуулна (ж: 2026-09 дээр «3 сар» → 09, 10, 11 сар төлөгдсөн).
+        </Typography.Paragraph>
       </Card>
     </div>
   );
