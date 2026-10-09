@@ -59,7 +59,8 @@ export default function EnrollmentPanel({ student }: { student: any }) {
         slots: v.slots.map((s: any) => ({
           weekday: s.weekday,
           slotIndex: s.slotIndex,
-          room: s.room,
+          // Хоосон = тухайн цагт сул байгаа өрөөнөөс автоматаар.
+          room: s.room || null,
         })),
       }),
     onSuccess: (res) => {
@@ -169,7 +170,11 @@ export default function EnrollmentPanel({ student }: { student: any }) {
                     setting?.timeSlots?.find((s: any) => s.index === v)?.label ??
                     v,
                 },
-                { title: "Өрөө", dataIndex: ["room", "name"] },
+                {
+                  title: "Өрөө",
+                  dataIndex: "room",
+                  render: (r) => r?.name ?? <Tag color="blue">Сул өрөөнд</Tag>,
+                },
               ]}
             />
             <Space style={{ marginTop: 8 }} wrap>
@@ -243,13 +248,11 @@ export default function EnrollmentPanel({ student }: { student: any }) {
                         options={slotOptions}
                       />
                     </Form.Item>
-                    <Form.Item
-                      name={[field.name, "room"]}
-                      rules={[{ required: true, message: "Өрөө" }]}
-                    >
+                    <Form.Item name={[field.name, "room"]}>
                       <Select
-                        style={{ width: 120 }}
-                        placeholder="Өрөө"
+                        style={{ width: 150 }}
+                        placeholder="Өрөө: автомат"
+                        allowClear
                         options={roomOptions}
                       />
                     </Form.Item>

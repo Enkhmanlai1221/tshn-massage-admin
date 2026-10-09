@@ -33,7 +33,9 @@ const opts = (map: Record<string, string>) =>
 export default function StudentsPage() {
   const { data: instruments } = useInstruments();
   const [instrument, setInstrument] = useState<string | undefined>();
-  const { data: teachers } = useTeachers(instrument ? { instrument } : undefined);
+  const { data: teachers } = useTeachers(
+    instrument ? { instrument } : undefined,
+  );
   const [open, setOpen] = useState<string | null>(null);
   const [filter, setFilter] = useState<Record<string, any>>({});
 

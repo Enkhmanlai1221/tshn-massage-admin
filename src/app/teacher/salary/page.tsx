@@ -55,6 +55,33 @@ export default function TeacherSalaryPage() {
         <Skeleton active paragraph={{ rows: 5 }} />
       ) : (
         <>
+          {/* ЦАЛИН АВСНААС ХОЙШ — сараас үл хамаарах, хамгийн чухал тоо. */}
+          {data?.sincePayout && (
+            <div
+              className="lesson-card"
+              style={{ padding: "16px", display: "flex", alignItems: "center", gap: 12 }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Цалин авснаас хойш
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                  {data.sincePayout.lastPeriodTo
+                    ? `Сүүлд ${data.sincePayout.lastPeriodTo} хүртэлх хугацааны цалин авсан`
+                    : "Одоогоор цалин олгогдоогүй"}
+                  {data.sincePayout.prior > 0 &&
+                    ` · үүнээс өмнө орсон ${data.sincePayout.prior}`}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "#15803d" }}>
+                  {data.sincePayout.total}
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>хичээл</div>
+              </div>
+            </div>
+          )}
+
           {/* Гол дүн — том, тод */}
           <div
             className="lesson-card"

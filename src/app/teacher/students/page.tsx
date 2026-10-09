@@ -22,6 +22,7 @@ import {
   Typography,
 } from "antd";
 import dayjs from "dayjs";
+import Link from "next/link";
 import {
   PlusOutlined,
   PhoneOutlined,
@@ -30,6 +31,7 @@ import {
 } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { teacherApi, teacherApiError } from "@/lib/teacher-api";
+import WeekSlotPicker, { WeekSlot } from "@/components/WeekSlotPicker";
 import { useTeacherAuth } from "@/lib/teacher-auth";
 import {
   LESSON_STATUS_COLOR,
@@ -41,16 +43,18 @@ import {
   studentName,
 } from "@/lib/labels";
 
-interface SlotChoice {
-  weekday?: number;
-  slotIndex?: number;
-  room?: string;
-}
-
 interface Available {
   weekday: number;
   slotIndex: number;
   rooms: { _id: string; name: string }[];
+}
+
+interface ScheduleOptions {
+  monthlyLessonQuota: number;
+  weeklyLessonCount: number;
+  workingDays: { value: number; label: string }[];
+  slots: { index: number; label: string }[];
+  available: Available[];
 }
 
 const onlyDigits = (v: string) => (v || "").replace(/\D/g, "").slice(0, 8);
@@ -73,7 +77,9 @@ function MonthBar({ month, pkg }: { month?: any; pkg?: any }) {
   const over = balance < 0;
   const low = !over && balance <= 2;
   const color = over ? "#dc2626" : low ? "#d97706" : "#16a34a";
-  const percent = entitled ? Math.min(100, Math.round((used / entitled) * 100)) : 100;
+  const percent = entitled
+    ? Math.min(100, Math.round((used / entitled) * 100))
+    : 100;
 
   return (
     <div
@@ -112,88 +118,12 @@ function MonthBar({ month, pkg }: { month?: any; pkg?: any }) {
         ) : (
           <>
             Үлдсэн{" "}
-            <b style={{ color: low ? "#b45309" : "#111827" }}>{balance}</b> оролт
+            <b style={{ color: low ? "#b45309" : "#111827" }}>{balance}</b>{" "}
+            оролт
             <span style={{ color: "#9ca3af" }}> · энэ сард {attended}</span>
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * Долоо хоногийн нэг тогтмол цаг сонгох мөр.
- *
- * Зөвхөн САРЫН ТУРШ сул байгаа гараг/цаг/өрөө харагдана (`available`) — тиймээс
- * багш давхцсан цаг сонгох боломжгүй, сервер рүү очоод няцаагдахгүй.
- */
-function SlotRow({
-  index,
-  available,
-  value,
-  taken,
-  onChange,
-}: {
-  index: number;
-  available: Available[];
-  value: SlotChoice;
-  taken: string[];
-  onChange: (v: SlotChoice) => void;
-}) {
-  const free = available.filter(
-    (a) => !taken.includes(`${a.weekday}#${a.slotIndex}`),
-  );
-  const weekdays = [...new Set(free.map((a) => a.weekday))].sort();
-  const times = free.filter((a) => a.weekday === value.weekday);
-  const rooms = times.find((a) => a.slotIndex === value.slotIndex)?.rooms ?? [];
-
-  return (
-    <div
-      style={{
-        border: "1px solid #eee",
-        borderRadius: 10,
-        padding: 10,
-        marginBottom: 10,
-      }}
-    >
-      <Typography.Text strong style={{ fontSize: 13 }}>
-        {index + 1}-р цаг
-      </Typography.Text>
-      <Space.Compact block style={{ marginTop: 6 }}>
-        <Select
-          size="large"
-          style={{ width: "40%" }}
-          placeholder="Гараг"
-          value={value.weekday}
-          options={weekdays.map((w) => ({ value: w, label: WEEKDAY_LABEL[w] }))}
-          onChange={(weekday) => onChange({ weekday })}
-        />
-        <Select
-          size="large"
-          style={{ width: "60%" }}
-          placeholder="Цаг"
-          value={value.slotIndex}
-          disabled={value.weekday === undefined}
-          options={times.map((t) => ({
-            value: t.slotIndex,
-            label:
-              (t as any).label?.split(" ").slice(1).join(" ") ||
-              `#${t.slotIndex}`,
-          }))}
-          onChange={(slotIndex) =>
-            onChange({ weekday: value.weekday, slotIndex })
-          }
-        />
-      </Space.Compact>
-      <Select
-        size="large"
-        style={{ width: "100%", marginTop: 6 }}
-        placeholder="Өрөө"
-        value={value.room}
-        disabled={value.slotIndex === undefined}
-        options={rooms.map((r) => ({ value: r._id, label: r.name }))}
-        onChange={(room) => onChange({ ...value, room })}
-      />
     </div>
   );
 }
@@ -207,7 +137,7 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { teacher } = useTeacherAuth();
   const qc = useQueryClient();
   const [form] = Form.useForm();
-  const [slots, setSlots] = useState<SlotChoice[]>([{}, {}]);
+  const [slots, setSlots] = useState<WeekSlot[]>([]);
 
   const {
     data: options,
@@ -218,11 +148,7 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
     enabled: open,
     retry: false,
     queryFn: async () =>
-      (await teacherApi.get("/student/options")).data as {
-        monthlyLessonQuota: number;
-        weeklyLessonCount: number;
-        available: Available[];
-      },
+      (await teacherApi.get("/student/options")).data as ScheduleOptions,
   });
 
   const weekly = options?.weeklyLessonCount ?? 2;
@@ -230,7 +156,7 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   const reset = () => {
     form.resetFields();
-    setSlots(Array.from({ length: weekly }, () => ({})));
+    setSlots([]);
   };
 
   const save = useMutation({
@@ -240,6 +166,7 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
         phone: onlyDigits(v.phone),
         parentPhone: v.parentPhone ? onlyDigits(v.parentPhone) : undefined,
         birthday: v.birthday ? v.birthday.toISOString() : null,
+        // Хоосон бол хуваарьгүй бүртгэнэ.
         slots,
       }),
     onSuccess: (res) => {
@@ -252,23 +179,8 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
     onError: (e) => message.error(teacherApiError(e)),
   });
 
-  const submit = (v: any) => {
-    const filled = slots.filter((s) => s.room !== undefined);
-    if (filled.length < weekly) {
-      message.error(`Долоо хоногийн ${weekly} цагийг бүрэн сонгоно уу.`);
-      return;
-    }
-    save.mutate(v);
-  };
-
-  const taken = (self: number) =>
-    slots
-      .map((s, i) =>
-        i === self || s.slotIndex === undefined
-          ? null
-          : `${s.weekday}#${s.slotIndex}`,
-      )
-      .filter(Boolean) as string[];
+  // Хуваарь ЗААВАЛ БИШ — нэр, утас хоёр л хангалттай.
+  const submit = (v: any) => save.mutate(v);
 
   return (
     <Drawer
@@ -295,7 +207,7 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
         showIcon
         style={{ marginBottom: 14 }}
         message={`${teacher?.name} · ${teacher?.instrument?.name}`}
-        description={`Сурагч танд автоматаар оногдоно. Долоо хоногт ${weekly} удаа, сард ${quota} оролт.`}
+        description="Нэр, утас хоёр л хангалттай. Хуваарь болон бусад мэдээллийг дараа нь нэмж болно."
       />
       <Form form={form} layout="vertical" onFinish={submit}>
         <Form.Item name="lastName" label="Овог">
@@ -324,79 +236,114 @@ function AddStudent({ open, onClose }: { open: boolean; onClose: () => void }) {
           <Input size="large" inputMode="numeric" placeholder="99001122" />
         </Form.Item>
 
-        <Typography.Text
-          strong
-          style={{ display: "block", margin: "6px 0 8px" }}
-        >
-          Долоо хоногийн хуваарь ({weekly} удаа)
-        </Typography.Text>
-        {isLoading ? (
-          <Skeleton active paragraph={{ rows: 3 }} />
-        ) : error ? (
-          // Сервер хариу өгөөгүйг «сул цаг алга» гэж БҮҮ хэл — өөр асуудал.
-          <Alert
-            type="error"
-            showIcon
-            message="Цагийн мэдээлэл ачаалагдсангүй"
-            description={teacherApiError(error)}
-            style={{ marginBottom: 12 }}
-          />
-        ) : !options?.available?.length ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="Сул цаг алга"
-            description="Ойрын 4 долоо хоногт сул өрөө/цаг үлдээгүй байна. Админд хандана уу."
-            style={{ marginBottom: 12 }}
-          />
-        ) : (
-          Array.from({ length: weekly }, (_, i) => (
-            <SlotRow
-              key={i}
-              index={i}
-              available={options.available}
-              value={slots[i] ?? {}}
-              taken={taken(i)}
-              onChange={(v) =>
-                setSlots((prev) => {
-                  const next = [...prev];
-                  while (next.length < weekly) next.push({});
-                  next[i] = v;
-                  return next;
-                })
-              }
-            />
-          ))
-        )}
-
-        <Form.Item name="level" label="Түвшин" initialValue="BEGINNER">
-          <Select
-            size="large"
-            options={Object.entries(STUDENT_LEVEL_LABEL).map(
-              ([value, label]) => ({
-                value,
-                label,
-              }),
-            )}
-          />
-        </Form.Item>
-        <Form.Item name="birthday" label="Төрсөн өдөр">
-          <DatePicker
-            size="large"
-            style={{ width: "100%" }}
-            format="YYYY-MM-DD"
-            inputReadOnly
-          />
-        </Form.Item>
-        <Form.Item name="parentName" label="Эцэг эхийн нэр">
-          <Input size="large" placeholder="Бага насны сурагчид" />
-        </Form.Item>
-        <Form.Item name="parentPhone" label="Эцэг эхийн утас">
-          <Input size="large" inputMode="numeric" placeholder="88001122" />
-        </Form.Item>
-        <Form.Item name="note" label="Тэмдэглэл">
-          <Input.TextArea rows={2} />
-        </Form.Item>
+        <Collapse
+          ghost
+          size="small"
+          style={{ marginBottom: 8 }}
+          items={[
+            {
+              key: "schedule",
+              label: (
+                <span style={{ fontWeight: 600 }}>
+                  Тогтмол хуваарь{" "}
+                  <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                    (заавал биш · 7 хоногт {weekly} удаа, сард {quota} оролт)
+                  </span>
+                </span>
+              ),
+              children: (
+                <>
+                  <Typography.Paragraph
+                    type="secondary"
+                    style={{ fontSize: 12, marginBottom: 8 }}
+                  >
+                    Сонговол энэ сарын хичээлүүд автоматаар товлогдоно.
+                    Сонгохгүй бол хичээл орох бүрт «Ирц» хэсгээс оролт нэмнэ.
+                  </Typography.Paragraph>
+                  {isLoading ? (
+                    <Skeleton active paragraph={{ rows: 3 }} />
+                  ) : error ? (
+                    // Сервер хариу өгөөгүйг «сул цаг алга» гэж БҮҮ хэл — өөр асуудал.
+                    <Alert
+                      type="error"
+                      showIcon
+                      message="Цагийн мэдээлэл ачаалагдсангүй"
+                      description={teacherApiError(error)}
+                      style={{ marginBottom: 12 }}
+                    />
+                  ) : !options?.available?.length ? (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      message="Сул цаг алга"
+                      description="Ойрын 4 долоо хоногт сул өрөө/цаг үлдээгүй байна. Админд хандана уу."
+                      style={{ marginBottom: 12 }}
+                    />
+                  ) : (
+                    <WeekSlotPicker
+                      workingDays={options.workingDays.map((d) => d.value)}
+                      slots={options.slots}
+                      available={options.available}
+                      value={slots}
+                      onChange={setSlots}
+                    />
+                  )}
+                </>
+              ),
+            },
+            {
+              key: "extra",
+              label: (
+                <span style={{ fontWeight: 600 }}>
+                  Нэмэлт мэдээлэл{" "}
+                  <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                    (заавал биш)
+                  </span>
+                </span>
+              ),
+              children: (
+                <>
+                  <Form.Item
+                    name="level"
+                    label="Түвшин"
+                    initialValue="BEGINNER"
+                  >
+                    <Select
+                      size="large"
+                      options={Object.entries(STUDENT_LEVEL_LABEL).map(
+                        ([value, label]) => ({
+                          value,
+                          label,
+                        }),
+                      )}
+                    />
+                  </Form.Item>
+                  <Form.Item name="birthday" label="Төрсөн өдөр">
+                    <DatePicker
+                      size="large"
+                      style={{ width: "100%" }}
+                      format="YYYY-MM-DD"
+                      inputReadOnly
+                    />
+                  </Form.Item>
+                  <Form.Item name="parentName" label="Эцэг эхийн нэр">
+                    <Input size="large" placeholder="Бага насны сурагчид" />
+                  </Form.Item>
+                  <Form.Item name="parentPhone" label="Эцэг эхийн утас">
+                    <Input
+                      size="large"
+                      inputMode="numeric"
+                      placeholder="88001122"
+                    />
+                  </Form.Item>
+                  <Form.Item name="note" label="Тэмдэглэл">
+                    <Input.TextArea rows={2} />
+                  </Form.Item>
+                </>
+              ),
+            },
+          ]}
+        />
       </Form>
     </Drawer>
   );
@@ -690,7 +637,7 @@ function BookLesson({ studentId }: { studentId: string }) {
       teacherApi.post(`/student/${studentId}/lesson`, {
         date: dateKey,
         slotIndex: slot.slotIndex,
-        room: slot.rooms[0]._id,
+        // Өрөө илгээхгүй — сул өрөөнөөс автоматаар.
       }),
     onSuccess: (res) => {
       message.success(res.data.message);
@@ -753,7 +700,7 @@ function BookLesson({ studentId }: { studentId: string }) {
             >
               <div style={{ fontWeight: 600 }}>{r.timeLabel}</div>
               <div style={{ fontSize: 11, color: "#888" }}>
-                {r.rooms[0].name}
+                {r.rooms.length} өрөө сул
               </div>
             </Button>
           ))}
@@ -799,6 +746,175 @@ function LessonRow({
   );
 }
 
+/**
+ * ХУВААРЬ ТОГТООХ / ЗАСАХ — 7 хоногийн хүснэгтээс нүд дарж сонгоно.
+ */
+function ScheduleDrawer({
+  studentId,
+  studentLabel,
+  current,
+  open,
+  onClose,
+}: {
+  studentId: string;
+  studentLabel: string;
+  current: WeekSlot[];
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+  const [value, setValue] = useState<WeekSlot[]>(current);
+  const [prevOpen, setPrevOpen] = useState(open);
+  // Нээгдэх бүрт одоогийн хуваарийг ачаална.
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setValue(current);
+  }
+
+  const {
+    data: options,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["teacher-student-options", studentId],
+    enabled: open,
+    retry: false,
+    queryFn: async () =>
+      (
+        await teacherApi.get("/student/options", {
+          params: { student: studentId },
+        })
+      ).data as ScheduleOptions,
+  });
+
+  const weekly = options?.weeklyLessonCount ?? 2;
+
+  const save = useMutation({
+    mutationFn: async (slots: WeekSlot[]) =>
+      teacherApi.put(`/student/${studentId}/schedule`, { slots }),
+    onSuccess: (res) => {
+      message.success(res.data.message, 5);
+      qc.invalidateQueries({ queryKey: ["teacher-student", studentId] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-student-options"] });
+      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
+      onClose();
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  const WEEKDAY = [
+    "Ням",
+    "Даваа",
+    "Мягмар",
+    "Лхагва",
+    "Пүрэв",
+    "Баасан",
+    "Бямба",
+  ];
+  const slotLabel = (i: number) =>
+    options?.slots.find((s) => s.index === i)?.label.split(/[–-]/)[0] ?? "";
+
+  return (
+    <Drawer
+      title={`${studentLabel} · хуваарь`}
+      placement="bottom"
+      height="92%"
+      open={open}
+      onClose={onClose}
+      styles={{ body: { paddingTop: 8 } }}
+      footer={
+        <Space direction="vertical" style={{ width: "100%" }}>
+          <Button
+            type="primary"
+            block
+            size="large"
+            className="touch-btn"
+            disabled={!value.length}
+            loading={save.isPending}
+            onClick={() => save.mutate(value)}
+          >
+            {value.length
+              ? `Хадгалах · 7 хоногт ${value.length} удаа`
+              : "Цаг сонгоно уу"}
+          </Button>
+          {current.length > 0 && (
+            <Popconfirm
+              title="Тогтмол хуваарийг цуцлах уу?"
+              description="Ирээдүйн товлогдсон хичээлүүд хасагдана."
+              okText="Цуцлах"
+              cancelText="Үгүй"
+              onConfirm={() => save.mutate([])}
+            >
+              <Button block type="text" danger>
+                Хуваарь цуцлах
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      }
+    >
+      <Typography.Paragraph style={{ fontSize: 13, marginBottom: 8 }}>
+        Сурагчийн орох цагуудыг хүснэгтээс <b>дарж</b> сонгоно уу. Ихэвчлэн 7
+        хоногт <b>{weekly}</b> удаа. Өрөө автоматаар оноогдоно.
+      </Typography.Paragraph>
+
+      {/* Сонгосон цагууд — шууд унших боломжтой */}
+      <div style={{ minHeight: 30, marginBottom: 8 }}>
+        {value.length ? (
+          <Space size={[6, 6]} wrap>
+            {value.map((v) => (
+              <Tag
+                key={`${v.weekday}#${v.slotIndex}`}
+                color="purple"
+                closable
+                onClose={(e) => {
+                  e.preventDefault();
+                  setValue(
+                    value.filter(
+                      (x) =>
+                        !(
+                          x.weekday === v.weekday && x.slotIndex === v.slotIndex
+                        ),
+                    ),
+                  );
+                }}
+                style={{ fontSize: 13, padding: "2px 8px" }}
+              >
+                {WEEKDAY[v.weekday]} {slotLabel(v.slotIndex)}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Одоогоор цаг сонгоогүй
+          </Typography.Text>
+        )}
+      </div>
+
+      {isLoading ? (
+        <Skeleton active paragraph={{ rows: 6 }} />
+      ) : error || !options ? (
+        <Alert
+          type="error"
+          showIcon
+          message="Цагийн мэдээлэл ачаалагдсангүй"
+          description={teacherApiError(error)}
+        />
+      ) : (
+        <WeekSlotPicker
+          workingDays={options.workingDays.map((d) => d.value)}
+          slots={options.slots}
+          available={options.available}
+          value={value}
+          onChange={setValue}
+        />
+      )}
+    </Drawer>
+  );
+}
+
 function StudentSheet({
   id,
   onClose,
@@ -809,6 +925,7 @@ function StudentSheet({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [tab, setTab] = useState("mark");
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["teacher-student", id],
@@ -866,6 +983,9 @@ function StudentSheet({
               }
             />
             <Space size={[6, 6]} wrap style={{ fontSize: 12 }}>
+              {data.unpaid?.total > 0 && (
+                <Tag color="green">Цалин аваагүй {data.unpaid.total}</Tag>
+              )}
               {p.absent > 0 && <Tag color="red">Тасалсан {p.absent}</Tag>}
               {p.excused > 0 && <Tag color="orange">Чөлөөтэй {p.excused}</Tag>}
               {p.scheduled > 0 && (
@@ -874,12 +994,66 @@ function StudentSheet({
               {p.prior > 0 && <Tag color="purple">Өмнөх {p.prior}</Tag>}
             </Space>
             {!!data.schedule?.length && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#888" }}>
-                Тогтмол цаг:{" "}
-                {data.schedule.map((s: any) => s.label).join(" · ")}
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: "#888",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <span style={{ flex: 1 }}>
+                  Тогтмол цаг:{" "}
+                  {data.schedule.map((s: any) => s.label).join(" · ")}
+                </span>
+                <Button size="small" onClick={() => setScheduleOpen(true)}>
+                  Засах
+                </Button>
               </div>
             )}
           </div>
+
+          {/* Хуваарьгүй сурагч — хамгийн түрүүнд харагдах үйлдэл. */}
+          {!data.schedule?.length && data.student.status !== "LEFT" && (
+            <div
+              style={{
+                ...card,
+                background: "#f5f3ff",
+                border: "1px dashed #a78bfa",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: 1, fontSize: 13 }}>
+                <div style={{ fontWeight: 600 }}>Тогтмол хуваарь алга</div>
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+                  7 хоногийн орох цагийг сонговол хичээлүүд автоматаар
+                  товлогдоно.
+                </div>
+              </div>
+              <Button
+                type="primary"
+                className="touch-btn"
+                onClick={() => setScheduleOpen(true)}
+              >
+                Хуваарь тогтоох
+              </Button>
+            </div>
+          )}
+
+          <ScheduleDrawer
+            studentId={id!}
+            studentLabel={studentName(data.student)}
+            current={(data.schedule ?? []).map((s: any) => ({
+              weekday: s.weekday,
+              slotIndex: s.slotIndex,
+            }))}
+            open={scheduleOpen}
+            onClose={() => setScheduleOpen(false)}
+          />
 
           {/* Норм дүүрсэн эсэх. Хурдац чөлөөтэй — эхний 7 хоногтоо 7 оролт
               хийсэн ч болно, зөвхөн сарын нийлбэр л чухал. */}
@@ -1034,6 +1208,13 @@ export default function TeacherStudentsPage() {
         count: number;
         quota: number;
         month: string;
+        sincePayout?: {
+          lastPeriodTo: string | null;
+          lessons: number;
+          prior: number;
+          total: number;
+          amount: number;
+        };
       },
   });
 
@@ -1062,12 +1243,11 @@ export default function TeacherStudentsPage() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.1 }}>
             Сурагч
           </div>
           <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
-            {summary.active} идэвхтэй · {data?.quota ?? 8} оролтоос{" "}
-            {summary.done} гүйцээсэн
+            {summary.active} идэвхтэй
           </div>
         </div>
         <Button
@@ -1142,8 +1322,27 @@ export default function TeacherStudentsPage() {
                           · <UserOutlined /> {s.parentName}
                         </span>
                       )}
+                      {!s.hasSchedule && s.status === "ACTIVE" && (
+                        <span style={{ color: "#7c3aed" }}> · Хуваарьгүй</span>
+                      )}
                     </div>
                   </div>
+                  {s.unpaid?.total > 0 && (
+                    <div
+                      title="Цалин авснаас хойш орсон хичээл"
+                      style={{
+                        background: "#dcfce7",
+                        color: "#15803d",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        borderRadius: 999,
+                        padding: "3px 10px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      +{s.unpaid.total}
+                    </div>
+                  )}
                   {phone && (
                     <a
                       href={`tel:${phone}`}

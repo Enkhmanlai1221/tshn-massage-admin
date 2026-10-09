@@ -103,7 +103,10 @@ function ChangeTeacherDrawer({
           <Select
             placeholder="Сонгох"
             options={(teachers || [])
-              .filter((t: any) => t._id !== (student?.teacher?._id ?? student?.teacher))
+              .filter(
+                (t: any) =>
+                  t._id !== (student?.teacher?._id ?? student?.teacher),
+              )
               .map((t: any) => ({ value: t._id, label: t.name }))}
           />
         </Form.Item>
@@ -311,9 +314,7 @@ function PriorPanel({ studentId }: { studentId: string }) {
                 style={{ width: 70 }}
                 value={r.count}
                 disabled={busy}
-                onChange={(v) =>
-                  edit(r.monthKey, { count: Number(v ?? 0) })
-                }
+                onChange={(v) => edit(r.monthKey, { count: Number(v ?? 0) })}
               />
             ),
           },
@@ -393,8 +394,7 @@ function PriorPanel({ studentId }: { studentId: string }) {
         </Typography.Text>
         {data.unpaidCount > 0 && (
           <Tag color="gold">
-            Багшид олгох: {data.unpaidCount} оролт ={" "}
-            {money(data.unpaidAmount)}
+            Багшид олгох: {data.unpaidCount} оролт = {money(data.unpaidAmount)}
           </Tag>
         )}
       </Space>
@@ -567,12 +567,18 @@ export default function StudentDrawer({
               <Divider orientation="left" plain>
                 Импортлосон ирцийн түүх
               </Divider>
-              <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+              <Typography.Paragraph
+                type="secondary"
+                style={{ marginBottom: 8 }}
+              >
                 Систем нэвтрэхээс өмнөх бүртгэл ({imported.source}). Эх файлд
                 өрөө, цаг байгаагүй тул энэ түүх календар, цалин, тасалтын
                 тоолуурт нөлөөлөхгүй.
                 {imported.firstLessonDate && (
-                  <> Анхны хичээл: <b>{imported.firstLessonDate}</b>.</>
+                  <>
+                    {" "}
+                    Анхны хичээл: <b>{imported.firstLessonDate}</b>.
+                  </>
                 )}
               </Typography.Paragraph>
               <Space wrap size={[4, 4]} style={{ marginBottom: 12 }}>
