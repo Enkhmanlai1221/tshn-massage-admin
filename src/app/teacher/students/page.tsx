@@ -32,6 +32,10 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { teacherApi, teacherApiError } from "@/lib/teacher-api";
 import WeekSlotPicker, { WeekSlot } from "@/components/WeekSlotPicker";
+import {
+  AttendanceSegments,
+  UndoEntryButton,
+} from "@/components/TeacherLessonCard";
 import { useTeacherAuth } from "@/lib/teacher-auth";
 import {
   LESSON_STATUS_COLOR,
@@ -747,6 +751,49 @@ function LessonRow({
 }
 
 /**
+ * Түүхийн нэг мөр — засах боломжтой бол «Засах» дарахад ирцийн сегмент ба
+ * «буцаах» товч дэлгэнэ. Андуурч / илүү бүртгэсэн оролтыг эндээс засна.
+ */
+function HistoryRow({ lesson }: { lesson: any }) {
+  const [open, setOpen] = useState(false);
+  const marked = ["ATTENDED", "ABSENT", "EXCUSED"].includes(lesson.status);
+
+  return (
+    <>
+      <LessonRow
+        lesson={lesson}
+        right={
+          <Space size={4}>
+            <Tag
+              color={LESSON_STATUS_COLOR[lesson.status]}
+              style={{ marginInlineEnd: 0 }}
+            >
+              {LESSON_STATUS_LABEL[lesson.status] ?? lesson.status}
+            </Tag>
+            {lesson.editable && (
+              <Button
+                type="link"
+                size="small"
+                style={{ paddingInline: 4 }}
+                onClick={() => setOpen((v) => !v)}
+              >
+                {open ? "Хаах" : "Засах"}
+              </Button>
+            )}
+          </Space>
+        }
+      />
+      {open && lesson.editable && (
+        <div style={{ paddingBottom: 10, borderBottom: "1px solid #f0f0f0" }}>
+          <AttendanceSegments lesson={lesson} />
+          {marked && <UndoEntryButton lesson={lesson} />}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
  * ХУВААРЬ ТОГТООХ / ЗАСАХ — 7 хоногийн хүснэгтээс нүд дарж сонгоно.
  */
 function ScheduleDrawer({
@@ -1173,20 +1220,16 @@ function StudentSheet({
                 />
               ) : (
                 data.lessons.map((l: any) => (
-                  <LessonRow
-                    key={l._id}
-                    lesson={l}
-                    right={
-                      <Tag
-                        color={LESSON_STATUS_COLOR[l.status]}
-                        style={{ marginInlineEnd: 0 }}
-                      >
-                        {LESSON_STATUS_LABEL[l.status] ?? l.status}
-                      </Tag>
-                    }
-                  />
+                  <HistoryRow key={l._id} lesson={l} />
                 ))
               )}
+              <Typography.Paragraph
+                type="secondary"
+                style={{ fontSize: 12, margin: "10px 0 0" }}
+              >
+                Сүүлийн {data.editWindowDays ?? 7} хоногийн бүртгэлийг засаж /
+                буцааж болно. Түүнээс өмнөхийг админд хандана.
+              </Typography.Paragraph>
             </div>
           )}
         </>

@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { App, Button, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Popconfirm, Tag, Tooltip, Typography } from "antd";
 import { PhoneOutlined, SwapOutlined } from "@ant-design/icons";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { teacherApi, teacherApiError } from "@/lib/teacher-api";
 import {
   LESSON_STATUS_LABEL,
@@ -152,23 +156,22 @@ export function TeacherLessonRow({
   );
 }
 
-/**
- * Нэг хичээлийн БҮТЭН карт — ирц тавихад зориулсан.
- *
- * Дизайн: зүүн талд цаг (том), голд нэр + өрөө, баруун талд 44px утасны
- * дүрс товч (цэнхэр линк БИШ — дугаарыг уншихаас илүү залгах нь чухал),
- * доор нь 3 хэсэгтэй сегмент сонголт (Ирсэн/Тасалсан/Чөлөө).
- */
-export default function TeacherLessonCard({
-  lesson,
-  showDate,
-}: {
-  lesson: any;
-  showDate?: boolean;
-}) {
+/** Ирц өөрчлөгдөхөд багшийн бүх дэлгэц (өдөр, сурагч, цалин) шинэчлэгдэнэ. */
+const invalidateTeacherViews = (qc: QueryClient) => {
+  for (const key of [
+    "teacher-schedule",
+    "teacher-student",
+    "teacher-students",
+    "teacher-salary",
+  ]) {
+    qc.invalidateQueries({ queryKey: [key] });
+  }
+};
+
+/** Ирсэн / Тасалсан / Чөлөө — 3 хэсэгтэй сегмент. */
+export function AttendanceSegments({ lesson }: { lesson: any }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
-  const [shiftOpen, setShiftOpen] = useState(false);
 
   const mark = useMutation({
     mutationFn: async (status: string) =>
@@ -183,10 +186,116 @@ export default function TeacherLessonCard({
       } else {
         message.success(`${LESSON_STATUS_LABEL[updated.status]} гэж бүртгэлээ`);
       }
-      qc.invalidateQueries({ queryKey: ["teacher-schedule"] });
+      invalidateTeacherViews(qc);
     },
     onError: (e) => message.error(teacherApiError(e)),
   });
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 3,
+        background: "#f2f3f5",
+        borderRadius: 9,
+        padding: 3,
+        marginTop: 12,
+      }}
+    >
+      {SEGMENTS.map((o) => {
+        const on = lesson.status === o.status;
+        const busy = mark.isPending && mark.variables === o.status;
+        return (
+          <button
+            key={o.status}
+            onClick={() => mark.mutate(o.status)}
+            disabled={mark.isPending}
+            style={{
+              minHeight: 40,
+              border: "none",
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: on ? ATTENDANCE_COLORS[o.status] : "transparent",
+              color: on ? "#fff" : "#374151",
+              boxShadow: on ? "0 1px 3px rgba(16,24,40,.18)" : "none",
+              opacity: busy ? 0.6 : 1,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * АНДУУРЧ / ИЛҮҮ БҮРТГЭСЭН ОРОЛТЫГ БУЦААХ.
+ *
+ * Төлөв солих нь «энэ оролт болоогүй» гэдгийг илэрхийлж чаддаггүй (тасалт нь
+ * сануулгад тоологдоно, чөлөө нь нөхөх хичээл шаардана) тул тусдаа үйлдэл.
+ * Хуваарийн хичээл «тавиагүй» болно, хуваарьт байгаагүй нөхөх хичээл хасагдана.
+ */
+export function UndoEntryButton({ lesson }: { lesson: any }) {
+  const { message } = App.useApp();
+  const qc = useQueryClient();
+
+  const undo = useMutation({
+    mutationFn: async () => teacherApi.delete(`/attendance/${lesson._id}`),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      invalidateTeacherViews(qc);
+    },
+    onError: (e) => message.error(teacherApiError(e)),
+  });
+
+  // Сервер дээрх `isAdhocLesson`-той ижил.
+  const adhoc = !lesson.enrollment && lesson.createdByModel === "Teacher";
+
+  return (
+    <Popconfirm
+      title="Энэ бүртгэлийг буцаах уу?"
+      description={
+        adhoc
+          ? "Хуваарьт байгаагүй нөхөх хичээл тул бүрмөсөн хасагдана."
+          : "Ирц арилж «тавиагүй» болно."
+      }
+      okText="Буцаах"
+      cancelText="Үгүй"
+      okButtonProps={{ danger: true }}
+      onConfirm={() => undo.mutate()}
+    >
+      <Button
+        type="link"
+        danger
+        size="small"
+        loading={undo.isPending}
+        style={{ display: "block", margin: "6px auto 0" }}
+      >
+        Андуурч бүртгэсэн бол буцаах
+      </Button>
+    </Popconfirm>
+  );
+}
+
+/**
+ * Нэг хичээлийн БҮТЭН карт — ирц тавихад зориулсан.
+ *
+ * Дизайн: зүүн талд цаг (том), голд нэр + өрөө, баруун талд 44px утасны
+ * дүрс товч (цэнхэр линк БИШ — дугаарыг уншихаас илүү залгах нь чухал),
+ * доор нь 3 хэсэгтэй сегмент сонголт (Ирсэн/Тасалсан/Чөлөө).
+ */
+export default function TeacherLessonCard({
+  lesson,
+  showDate,
+}: {
+  lesson: any;
+  showDate?: boolean;
+}) {
+  const [shiftOpen, setShiftOpen] = useState(false);
 
   const marked = ["ATTENDED", "ABSENT", "EXCUSED"].includes(lesson.status);
   const lastMove = lesson.moveHistory?.[lesson.moveHistory.length - 1];
@@ -274,43 +383,10 @@ export default function TeacherLessonCard({
 
       {/* Мөр 2: ирц бүртгэх сегмент */}
       {lesson.editable ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 3,
-            background: "#f2f3f5",
-            borderRadius: 9,
-            padding: 3,
-            marginTop: 12,
-          }}
-        >
-          {SEGMENTS.map((o) => {
-            const on = lesson.status === o.status;
-            const busy = mark.isPending && mark.variables === o.status;
-            return (
-              <button
-                key={o.status}
-                onClick={() => mark.mutate(o.status)}
-                disabled={mark.isPending}
-                style={{
-                  minHeight: 40,
-                  border: "none",
-                  borderRadius: 6,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  background: on ? ATTENDANCE_COLORS[o.status] : "transparent",
-                  color: on ? "#fff" : "#374151",
-                  boxShadow: on ? "0 1px 3px rgba(16,24,40,.18)" : "none",
-                  opacity: busy ? 0.6 : 1,
-                }}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <AttendanceSegments lesson={lesson} />
+          {marked && <UndoEntryButton lesson={lesson} />}
+        </>
       ) : (
         <Typography.Text
           type="secondary"
