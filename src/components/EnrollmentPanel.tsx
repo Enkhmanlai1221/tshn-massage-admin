@@ -25,7 +25,7 @@ import { ENROLLMENT_STATUS_LABEL, WEEKDAY_LABEL } from "@/lib/labels";
 /**
  * Сурагчийн тогтмол хуваарь — 7 хоногт давтагдах цагууд.
  * Хичээл эндээс үүсдэг: үүсгэхэд тухайн сарын үлдсэн хугацаа, дараа нь
- * "Сунгах" товчоор сар бүр нэмэгдэнэ.
+ * сервер автоматаар сунгана. "Сунгах" товч нь цааш урьдчилан үүсгэхэд.
  */
 export default function EnrollmentPanel({ student }: { student: any }) {
   const { message } = App.useApp();
