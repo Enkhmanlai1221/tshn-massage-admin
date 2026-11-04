@@ -9,11 +9,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { teacherApi, teacherApiError } from "@/lib/teacher-api";
-import {
-  LESSON_STATUS_LABEL,
-  minuteLabel,
-  studentName,
-} from "@/lib/labels";
+import { LESSON_STATUS_LABEL, minuteLabel, studentName } from "@/lib/labels";
 import ShiftLessonModal from "./ShiftLessonModal";
 
 /**
@@ -44,9 +40,12 @@ export function lessonStatusMeta(lesson: any): {
   dot?: string;
 } {
   const s = lesson.status;
-  if (s === "ATTENDED") return { label: "ирсэн", color: "#15803d", dot: "#16a34a" };
-  if (s === "ABSENT") return { label: "тасалсан", color: "#b91c1c", dot: "#dc2626" };
-  if (s === "EXCUSED") return { label: "чөлөө", color: "#b45309", dot: "#d97706" };
+  if (s === "ATTENDED")
+    return { label: "ирсэн", color: "#15803d", dot: "#16a34a" };
+  if (s === "ABSENT")
+    return { label: "тасалсан", color: "#b91c1c", dot: "#dc2626" };
+  if (s === "EXCUSED")
+    return { label: "чөлөө", color: "#b45309", dot: "#d97706" };
   if (s === "SCHEDULED") {
     const past = lesson.date <= new Date().toISOString().slice(0, 10);
     if (past && lesson.editable)
@@ -72,6 +71,7 @@ export function TeacherLessonRow({
 }) {
   const meta = lessonStatusMeta(lesson);
   const [start] = String(lesson.timeLabel ?? "").split("–");
+
   return (
     <div
       style={{
@@ -381,7 +381,6 @@ export default function TeacherLessonCard({
         )}
       </div>
 
-      {/* Мөр 2: ирц бүртгэх сегмент */}
       {lesson.editable ? (
         <>
           <AttendanceSegments lesson={lesson} />

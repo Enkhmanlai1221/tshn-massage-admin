@@ -75,7 +75,7 @@ const onlyDigits = (v: string) => (v || "").replace(/\D/g, "").slice(0, 8);
 function MonthBar({ month, pkg }: { month?: any; pkg?: any }) {
   const attended = month?.attended ?? 0;
   // Төлбөр ч, оролт ч бүртгэгдээгүй бол харуулах зүйлгүй.
-  if (!pkg || (pkg.paidMonths === 0 && pkg.used === 0)) return null;
+  if (!pkg || !pkg.hasRecords) return null;
 
   const { entitled = 0, used = 0, balance = 0 } = pkg;
   const over = balance < 0;

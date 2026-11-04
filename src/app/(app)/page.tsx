@@ -23,7 +23,7 @@ import dayjs from "dayjs";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import StudentDrawer from "@/components/StudentDrawer";
-import { studentName, money, PaymentStatusTag } from "@/lib/labels";
+import { studentName, money, BalanceTag } from "@/lib/labels";
 
 /**
  * Сургуулийн хэмжээний сарын нэгтгэл — «бүх сурагчийн оролт нийлээд хэд вэ».
@@ -254,7 +254,7 @@ export default function DashboardPage() {
                 render: (_, r: any) => {
                   const pk = r.package;
                   if (!pk) return "—";
-                  if (pk.entitled === 0) {
+                  if (!pk.hasRecords || pk.entitled === 0) {
                     return (
                       <Tooltip title="Төлбөрийн бүртгэл алга — оруулна уу">
                         <Tag color="red">төлбөр бүртгээгүй</Tag>
@@ -263,7 +263,7 @@ export default function DashboardPage() {
                   }
                   return (
                     <Tooltip
-                      title={`${pk.paidMonths} сар төлсөн = ${pk.entitled} оролт`}
+                      title={`${pk.entitled} оролт төлсөн · ${pk.used} орсон · үлдсэн ${pk.balance}`}
                     >
                       <Tag>
                         {pk.used}/{pk.entitled} ашигласан
@@ -302,11 +302,10 @@ export default function DashboardPage() {
                   ),
               },
               {
-                title: "Төлбөр",
-                dataIndex: "lastPaidMonth",
-                key: "lastPaidMonth",
+                title: "Үлдэгдэл",
+                key: "balance",
                 width: 150,
-                render: (v) => <PaymentStatusTag lastPaidMonth={v} />,
+                render: (_, r: any) => <BalanceTag pkg={r.package} />,
               },
             ]}
           />

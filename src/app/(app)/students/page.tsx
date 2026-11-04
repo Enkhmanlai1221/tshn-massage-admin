@@ -23,7 +23,6 @@ import {
   STUDENT_LEVEL_LABEL,
   STUDENT_STATUS_LABEL,
   StudentStatusTag,
-  PaymentStatusTag,
   studentName,
 } from "@/lib/labels";
 
@@ -114,30 +113,24 @@ export default function StudentsPage() {
             render: (_, r: any) => {
               const pk = r.package;
               const month = r.month?.attended ?? 0;
-              if (!pk || (pk.paidMonths === 0 && pk.used === 0)) {
+              if (!pk || !pk.hasRecords) {
                 return <Typography.Text type="secondary">—</Typography.Text>;
               }
               // «Үлдсэн» нь БАГЦААС — сарын норм биш (сурагч өөрийн хурдаараа).
               return (
                 <Tooltip
-                  title={`Багц: ${pk.entitled} оролт (${pk.paidMonths} сар) · ашигласан ${pk.used} · энэ сард ${month}`}
+                  title={`Төлсөн ${pk.entitled} оролт · ашигласан ${pk.used} · энэ сард ${month}`}
                 >
                   {pk.balance > 2 ? (
                     <Tag color="blue">үлдсэн {pk.balance}</Tag>
                   ) : pk.balance >= 0 ? (
                     <Tag color="orange">үлдсэн {pk.balance}</Tag>
                   ) : (
-                    <Tag color="red">{Math.abs(pk.balance)} илүү орсон</Tag>
+                    <Tag color="red">{Math.abs(pk.balance)} оролт өртэй</Tag>
                   )}
                 </Tooltip>
               );
             },
-          },
-          {
-            title: "Төлбөр",
-            dataIndex: "lastPaidMonth",
-            key: "lastPaidMonth",
-            render: (v) => <PaymentStatusTag lastPaidMonth={v} />,
           },
           {
             title: "Статус",

@@ -11,7 +11,6 @@ import {
   Form,
   Input,
   InputNumber,
-  DatePicker,
   Select,
   Space,
   Table,
@@ -20,15 +19,17 @@ import {
 } from "antd";
 import { SwapOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs, { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { api, apiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { PurchaseModal } from "@/components/PurchaseModal";
+import { AdjustmentModal } from "@/components/AdjustmentModal";
 import { useTeachers } from "@/lib/hooks";
 import {
   GENDER_LABEL,
   LessonStatusTag,
   STUDENT_LEVEL_LABEL,
   StudentStatusTag,
-  PaymentStatusTag,
   studentName,
   money,
 } from "@/lib/labels";
@@ -125,18 +126,27 @@ function ChangeTeacherDrawer({
  * цалинжсан K»-г админ эндээс тавина. Систем: цалинд орох = N − K −
  * (олголтод орсон), сарын явц = системд бүртгэгдсэн + өмнөх N.
  */
-function PriorPanel({ studentId }: { studentId: string }) {
+function PriorPanel({ studentId, student }: { studentId: string; student: any }) {
   const { message } = App.useApp();
   const qc = useQueryClient();
+  const { can } = useAuth();
+  const [paying, setPaying] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
 
   /** Хадгалаагүй засварууд — сар бүрээр. */
   const [draft, setDraft] = useState<Record<string, Row> | null>(null);
-  const [payFrom, setPayFrom] = useState<Dayjs>(dayjs());
-  const [payMonths, setPayMonths] = useState<number>(1);
 
   const { data } = useQuery({
     queryKey: ["student-prior", studentId],
     queryFn: async () => (await api.get(`/student/${studentId}/prior`)).data,
+  });
+
+  const canPay = can("PAYMENT", "isApprove");
+  const { data: purchases } = useQuery({
+    queryKey: ["purchases", { student: studentId }],
+    enabled: can("PAYMENT", "isRead"),
+    queryFn: async () =>
+      (await api.get("/payment/purchase", { params: { student: studentId, limit: 10 } })).data,
   });
 
   const refresh = () => {
@@ -158,19 +168,6 @@ function PriorPanel({ studentId }: { studentId: string }) {
     onError: (e) => message.error(apiError(e)),
   });
 
-  const savePayment = useMutation({
-    mutationFn: async () =>
-      api.post(`/payment/${studentId}`, {
-        monthKey: payFrom.format("YYYY-MM"),
-        status: "PAID",
-        months: payMonths,
-      }),
-    onSuccess: (res) => {
-      message.success(res.data.message);
-      refresh();
-    },
-    onError: (e) => message.error(apiError(e)),
-  });
 
   if (!data) return null;
   const p = data.progress;
@@ -216,7 +213,7 @@ function PriorPanel({ studentId }: { studentId: string }) {
   };
 
   const dirty = draft !== null;
-  const busy = saveMonths.isPending || savePayment.isPending;
+  const busy = saveMonths.isPending;
 
   return (
     <>
@@ -224,7 +221,7 @@ function PriorPanel({ studentId }: { studentId: string }) {
         Төлбөр ба оролт
       </Divider>
 
-      {pkg && pkg.paidMonths > 0 && (
+      {pkg && pkg.hasRecords && (
         <Alert
           type={pkg.balance < 0 ? "warning" : "info"}
           showIcon
@@ -232,14 +229,19 @@ function PriorPanel({ studentId }: { studentId: string }) {
           message={
             <Space wrap>
               <b>
-                Багц: {pkg.entitled} оролт ({pkg.paidMonths} сар × {data.quota})
+                Төлсөн: {pkg.entitled} оролт
               </b>
+              {pkg.adjustment !== 0 && (
+                <Tag color="purple">
+                  залруулга {pkg.adjustment > 0 ? `+${pkg.adjustment}` : pkg.adjustment}
+                </Tag>
+              )}
               <Tag color="green">орсон {pkg.used}</Tag>
               {pkg.balance >= 0 ? (
                 <Tag color="blue">үлдсэн {pkg.balance}</Tag>
               ) : (
                 <Tag color="red">
-                  төлснөөс {Math.abs(pkg.balance)} оролт илүү орсон
+                  {Math.abs(pkg.balance)} оролт өртэй (төлснөөсөө илүү орсон)
                 </Tag>
               )}
             </Space>
@@ -252,46 +254,34 @@ function PriorPanel({ studentId }: { studentId: string }) {
         />
       )}
 
-      {/* 1. Хэдэн сарын төлбөр авсныг нэг дор тэмдэглэнэ. */}
-      <Space wrap align="end" size={8} style={{ marginBottom: 16 }}>
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Төлбөр: эхлэх сар
-          </Typography.Text>
-          <br />
-          <DatePicker
-            picker="month"
-            value={payFrom}
-            onChange={(v) => v && setPayFrom(v)}
-            allowClear={false}
-            format="YYYY-MM"
-            style={{ width: 120 }}
-          />
-        </div>
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            хэдэн сар
-          </Typography.Text>
-          <br />
-          <InputNumber
-            min={1}
-            max={12}
-            value={payMonths}
-            onChange={(v) => setPayMonths(Number(v) || 1)}
-            style={{ width: 70 }}
-          />
-        </div>
-        <Button
-          onClick={() => savePayment.mutate()}
-          loading={savePayment.isPending}
-          disabled={busy}
-        >
-          Төлсөн гэж тэмдэглэх
-        </Button>
-        <Typography.Text type="secondary">
-          = {payMonths * data.quota} оролтын эрх
-        </Typography.Text>
+      {/* 1. Оролтын төлбөр — бэлэн/шилжүүлэг гараар, QPay автоматаар. */}
+      <Space wrap align="center" size={8} style={{ marginBottom: 8 }}>
+        {canPay && (
+          <Button type="primary" ghost onClick={() => setPaying(true)} disabled={busy}>
+            Төлбөр авах
+          </Button>
+        )}
+        {canPay && (
+          <Button onClick={() => setAdjusting(true)} disabled={busy}>
+            Оролт засах (±)
+          </Button>
+        )}
+        {(purchases?.rows || []).slice(0, 5).map((p: any) => (
+          <Tag key={p._id} color={p.status === "VOID" ? "default" : "green"}>
+            {dayjs(p.paidAt).format("MM-DD")} · {p.lessons} оролт
+            {p.amount != null ? ` · ${money(p.amount)}` : ""}
+            {p.status === "VOID" ? " (хүчингүй)" : ""}
+          </Tag>
+        ))}
       </Space>
+      <PurchaseModal student={student} open={paying} onClose={() => { setPaying(false); refresh(); }} />
+      <AdjustmentModal
+        student={student}
+        balance={pkg?.balance ?? 0}
+        open={adjusting}
+        onClose={() => { setAdjusting(false); refresh(); }}
+      />
+      <div style={{ marginBottom: 16 }} />
 
       {/* 2. Өнгөрсөн оролтыг сар бүрээр — бүгдийг нэг хадгалалтаар. */}
       <Table
@@ -494,12 +484,9 @@ export default function StudentDrawer({
             <Descriptions.Item label="Эцэг эхийн утас">
               {student.parentPhone || "—"}
             </Descriptions.Item>
-            <Descriptions.Item label="Төлбөр" span={2}>
-              <PaymentStatusTag lastPaidMonth={student.lastPaidMonth} />
-            </Descriptions.Item>
           </Descriptions>
 
-          <PriorPanel studentId={student._id} />
+          <PriorPanel studentId={student._id} student={student} />
 
           <Divider orientation="left" plain>
             Хуваарь

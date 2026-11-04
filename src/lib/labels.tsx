@@ -1,5 +1,4 @@
 import { Tag } from "antd";
-import dayjs from "dayjs";
 
 /** Хичээлийн төлөв — монгол шошго + өнгө (backend-ийн LESSON.ts-тэй нэг эх сурвалж). */
 export const LESSON_STATUS_LABEL: Record<string, string> = {
@@ -128,23 +127,23 @@ export const studentName = (s: any) => {
   return `${initial}${s.firstName ?? ""}`.trim() || "—";
 };
 
+export const PURCHASE_METHOD_LABEL: Record<string, string> = {
+  QPAY: "QPay",
+  CASH: "Бэлэн",
+  TRANSFER: "Шилжүүлэг",
+  CARD: "Карт",
+  LEGACY_MONTH: "Сараар (хуучин)",
+};
+
 /**
- * ТӨЛБӨРИЙН ШОШГО — урьдчилгааг зөв харуулна.
+ * ОРОЛТЫН ҮЛДЭГДЛИЙН ШОШГО — төлбөрийн нэгж нь оролт (сар биш).
  *
- * Сурагч 2-3 сараар урьдчилж төлдөг тул `lastPaidMonth`-ыг ЗӨВХӨН энэ сартай
- * тэнцүү эсэхээр шалгавал урьдчилж төлсөн сурагч «Төлөөгүй» гэж улаанаар
- * гарч, админ дахин нэхэмжилнэ. Тиймээс харьцуулалт нь `>=`.
+ * `pkg` = серверийн PackageBalance. Бүртгэлгүй бол «төлбөргүй», ≤2 бол шар,
+ * сөрөг (төлснөөсөө илүү орсон) бол улаан.
  */
-export function PaymentStatusTag({
-  lastPaidMonth,
-}: {
-  lastPaidMonth?: string | null;
-}) {
-  const current = dayjs().format("YYYY-MM");
-  if (!lastPaidMonth) return <Tag color="red">Төлөөгүй</Tag>;
-  if (lastPaidMonth < current) {
-    return <Tag color="red">Төлөөгүй · сүүлд {lastPaidMonth}</Tag>;
-  }
-  if (lastPaidMonth === current) return <Tag color="green">Төлсөн</Tag>;
-  return <Tag color="blue">{lastPaidMonth} хүртэл төлсөн</Tag>;
+export function BalanceTag({ pkg }: { pkg?: any }) {
+  if (!pkg || !pkg.hasRecords) return <Tag>төлбөргүй</Tag>;
+  if (pkg.balance < 0) return <Tag color="red">{Math.abs(pkg.balance)} оролт өртэй</Tag>;
+  if (pkg.balance <= 2) return <Tag color="orange">үлдсэн {pkg.balance}</Tag>;
+  return <Tag color="blue">үлдсэн {pkg.balance}</Tag>;
 }

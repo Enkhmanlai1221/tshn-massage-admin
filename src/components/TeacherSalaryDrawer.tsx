@@ -333,7 +333,7 @@ export default function TeacherSalaryDrawer({
                 width: 150,
                 render: (_, r: any) => {
                   const pk = r.package;
-                  if (!pk || pk.paidMonths === 0) {
+                  if (!pk || !pk.hasRecords) {
                     return (
                       <Typography.Text type="secondary">
                         төлбөргүй
@@ -342,7 +342,7 @@ export default function TeacherSalaryDrawer({
                   }
                   return (
                     <Tooltip
-                      title={`${pk.paidMonths} сар төлсөн = ${pk.entitled} оролт, ${pk.used} нь орсон`}
+                      title={`${pk.entitled} оролт төлсөн, ${pk.used} нь орсон`}
                     >
                       {pk.balance >= 0 ? (
                         <Tag color="blue">

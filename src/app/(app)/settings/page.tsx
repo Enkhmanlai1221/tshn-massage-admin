@@ -10,6 +10,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Select,
   Space,
   Table,
   Tag,
@@ -92,6 +93,36 @@ export default function SettingsPage() {
               options={WEEKDAY_LABEL.map((label, value) => ({ label, value }))}
             />
           </Form.Item>
+        </Card>
+
+        <Card size="small" title="Төлбөр (оролтоор)" style={{ marginTop: 16 }}>
+          <Space wrap align="start" size="large">
+            <Form.Item
+              name="lessonPrice"
+              label="Нэг оролтын үнэ (₮)"
+              extra="Төлбөр = оролтын тоо × энэ үнэ. QPay, гар бүртгэл хоёулаа үүнийг ашиглана."
+              style={{ width: 300 }}
+            >
+              <InputNumber
+                min={0}
+                step={1000}
+                style={{ width: "100%" }}
+                formatter={(v) => `${v ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                parser={(v) => Number(String(v ?? "").replace(/,/g, "")) as any}
+              />
+            </Form.Item>
+            <Form.Item
+              name="lessonPackages"
+              label="Санал болгох багц (оролтын тоо)"
+              extra="Сурагчийн апп болон «Төлбөр авах» цонхонд харагдана."
+              style={{ width: 320 }}
+              getValueFromEvent={(v: any[]) =>
+                (v || []).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n <= 96)
+              }
+            >
+              <Select mode="tags" tokenSeparators={[",", " "]} placeholder="8, 16, 24" />
+            </Form.Item>
+          </Space>
         </Card>
 
         {editable && (
