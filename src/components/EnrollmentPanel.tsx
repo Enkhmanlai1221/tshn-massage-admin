@@ -16,7 +16,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import { useRooms, useSetting } from "@/lib/hooks";
@@ -32,6 +32,8 @@ export default function EnrollmentPanel({ student }: { student: any }) {
   const qc = useQueryClient();
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
+  /** Drawer засах горимд нээгдсэн эсэх (false = шинээр үүсгэх). */
+  const [editing, setEditing] = useState(false);
 
   const { data: rooms } = useRooms();
   const { data: setting } = useSetting();
@@ -51,17 +53,38 @@ export default function EnrollmentPanel({ student }: { student: any }) {
     qc.invalidateQueries({ queryKey: ["calendar"] });
   };
 
+  const toSlots = (v: any) =>
+    v.slots.map((s: any) => ({
+      weekday: s.weekday,
+      slotIndex: s.slotIndex,
+      // Хоосон = тухайн цагт сул байгаа өрөөнөөс автоматаар.
+      room: s.room || null,
+    }));
+
+  const openCreate = () => {
+    setEditing(false);
+    form.resetFields();
+    setOpen(true);
+  };
+
+  const openEdit = () => {
+    setEditing(true);
+    form.setFieldsValue({
+      slots: active.slots.map((s: any) => ({
+        weekday: s.weekday,
+        slotIndex: s.slotIndex,
+        room: s.room?._id ?? s.room ?? undefined,
+      })),
+    });
+    setOpen(true);
+  };
+
   const create = useMutation({
     mutationFn: async (v: any) =>
       api.post("/enrollment", {
         student: student._id,
         teacher: student.teacher?._id ?? student.teacher,
-        slots: v.slots.map((s: any) => ({
-          weekday: s.weekday,
-          slotIndex: s.slotIndex,
-          // Хоосон = тухайн цагт сул байгаа өрөөнөөс автоматаар.
-          room: s.room || null,
-        })),
+        slots: toSlots(v),
       }),
     onSuccess: (res) => {
       message.success(res.data.message);
@@ -72,6 +95,23 @@ export default function EnrollmentPanel({ student }: { student: any }) {
         );
       }
       setOpen(false);
+      form.resetFields();
+      refresh();
+    },
+    onError: (e) => message.error(apiError(e)),
+  });
+
+  /**
+   * Хуваарийн цагийг засна. Сервер ирээдүйн товлогдсон хичээлийг устгаж шинэ
+   * цагаар дахин үүсгэнэ — өнгөрсөн болон ирц бүртгэгдсэн хичээл хэвээр.
+   */
+  const update = useMutation({
+    mutationFn: async (v: any) =>
+      api.put(`/enrollment/${active._id}`, { slots: toSlots(v) }),
+    onSuccess: (res) => {
+      message.success(res.data.message);
+      setOpen(false);
+      setEditing(false);
       form.resetFields();
       refresh();
     },
@@ -120,6 +160,9 @@ export default function EnrollmentPanel({ student }: { student: any }) {
         extra={
           active ? (
             <Space>
+              <Button size="small" icon={<EditOutlined />} onClick={openEdit}>
+                Засах
+              </Button>
               <Button
                 size="small"
                 type="primary"
@@ -143,7 +186,7 @@ export default function EnrollmentPanel({ student }: { student: any }) {
               size="small"
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setOpen(true)}
+              onClick={openCreate}
             >
               Хуваарь үүсгэх
             </Button>
@@ -194,31 +237,42 @@ export default function EnrollmentPanel({ student }: { student: any }) {
       </Card>
 
       <Drawer
-        title="Тогтмол хуваарь үүсгэх"
+        title={editing ? "Тогтмол хуваарь засах" : "Тогтмол хуваарь үүсгэх"}
         open={open}
         onClose={() => setOpen(false)}
         width={560}
+        // Form үргэлж mount хийгдсэн байх ёстой — эс бөгөөс засах үед
+        // setFieldsValue анх нээхэд хоосон form руу бичигдэнэ.
+        forceRender
         footer={
           <Space style={{ display: "flex", justifyContent: "flex-end" }}>
             <Button onClick={() => setOpen(false)}>Болих</Button>
             <Button
               type="primary"
-              loading={create.isPending}
+              loading={create.isPending || update.isPending}
               onClick={() => form.submit()}
             >
-              Үүсгэх
+              {editing ? "Хадгалах" : "Үүсгэх"}
             </Button>
           </Space>
         }
       >
         <Alert
-          type="info"
+          type={editing ? "warning" : "info"}
           showIcon
           style={{ marginBottom: 16 }}
           message={`Багш: ${student?.teacher?.name} · Хөгжим: ${student?.instrument?.name}`}
-          description="Ердийн тохиолдолд 7 хоногт 2 цаг сонгоно. Үүсгэхэд энэ сарын үлдсэн хичээлүүд шууд товлогдоно."
+          description={
+            editing
+              ? "Өнөөдрөөс хойшхи товлогдсон хичээлүүд устаж, шинэ цагаар дахин товлогдоно. Өнгөрсөн болон ирц бүртгэгдсэн хичээл өөрчлөгдөхгүй."
+              : "Ердийн тохиолдолд 7 хоногт 2 цаг сонгоно. Үүсгэхэд энэ сарын үлдсэн хичээлүүд шууд товлогдоно."
+          }
         />
-        <Form form={form} layout="vertical" onFinish={(v) => create.mutate(v)}>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={(v) => (editing ? update.mutate(v) : create.mutate(v))}
+        >
           <Form.List name="slots" initialValue={[{}, {}]}>
             {(fields, { add, remove }) => (
               <>
