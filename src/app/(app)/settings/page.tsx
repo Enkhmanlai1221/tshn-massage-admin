@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, apiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { WEEKDAY_LABEL, minuteLabel } from "@/lib/labels";
+import InstrumentPricesCard from "@/components/InstrumentPricesCard";
 
 export default function SettingsPage() {
   const { message } = App.useApp();
@@ -96,11 +97,19 @@ export default function SettingsPage() {
         </Card>
 
         <Card size="small" title="Төлбөр (оролтоор)" style={{ marginTop: 16 }}>
+          {data && (data.lessonPrice ?? 0) < 1000 && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={`Ерөнхий үнэ ${(data.lessonPrice ?? 0).toLocaleString()}₮ байна — өөрийн үнэгүй хөгжмийн сурагчид ${data.lessonPackages?.[0] ?? 8} оролтыг ${((data.lessonPrice ?? 0) * (data.lessonPackages?.[0] ?? 8)).toLocaleString()}₮-өөр төлнө.`}
+            />
+          )}
           <Space wrap align="start" size="large">
             <Form.Item
               name="lessonPrice"
-              label="Нэг оролтын үнэ (₮)"
-              extra="Төлбөр = оролтын тоо × энэ үнэ. QPay, гар бүртгэл хоёулаа үүнийг ашиглана."
+              label="Ерөнхий нэг оролтын үнэ (₮)"
+              extra="Өөрийн үнэгүй хөгжмийн сурагч энэ үнээр төлнө (доорх «Хөгжим бүрийн үнэ»). Төлбөр = оролтын тоо × үнэ."
               style={{ width: 300 }}
             >
               <InputNumber
@@ -136,6 +145,8 @@ export default function SettingsPage() {
           </Button>
         )}
       </Form>
+
+      <InstrumentPricesCard generalPrice={data?.lessonPrice ?? 0} />
 
       <Card size="small" title="Хичээлийн цагийн сүлжээ" style={{ marginTop: 16 }}>
         <Alert
