@@ -132,6 +132,67 @@ export default function SettingsPage() {
               <Select mode="tags" tokenSeparators={[",", " "]} placeholder="8, 16, 24" />
             </Form.Item>
           </Space>
+
+          {/* ОЛОН САРЫН ХЯМДРАЛ — «2 сараар төлбөл сарын үнэ 500,000₮» */}
+          <Form.Item noStyle shouldUpdate>
+            {({ getFieldValue }) => {
+              const quota = getFieldValue("monthlyLessonQuota") || 8;
+              const base = getFieldValue("lessonPrice") || 0;
+              return (
+                <div style={{ marginTop: 4 }}>
+                  <Typography.Text strong>Олон сарын хямдрал (өөрийн үнэгүй хөгжимд)</Typography.Text>
+                  <div style={{ fontSize: 13, color: "#6b7280", margin: "4px 0 10px" }}>
+                    1 сар = {quota} оролт. 1 сар — <b>{(base * quota).toLocaleString()}₮</b> (ерөнхий
+                    үнээр). Доорх сараас дээш нэг дор төлбөл тэр шатны сарын үнээр бодогдоно.
+                    Өөрийн үнэтэй хөгжмийн хямдралыг доорх «Хөгжим бүрийн үнэ»-ээс тохируулна.
+                  </div>
+                </div>
+              );
+            }}
+          </Form.Item>
+          <Form.List name="monthTiers">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map((field) => (
+                  <Space key={field.key} align="baseline" wrap style={{ marginBottom: 4 }}>
+                    <Form.Item
+                      name={[field.name, "months"]}
+                      rules={[{ required: true, message: "Сар" }]}
+                    >
+                      <InputNumber min={2} max={12} addonAfter="сараар" style={{ width: 140 }} />
+                    </Form.Item>
+                    <Form.Item
+                      name={[field.name, "monthPrice"]}
+                      rules={[{ required: true, message: "Сарын үнэ" }]}
+                    >
+                      <InputNumber
+                        min={0}
+                        step={10000}
+                        addonAfter="₮ / сар"
+                        style={{ width: 200 }}
+                        formatter={(v) => `${v ?? ""}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+                        parser={(v) => Number(String(v ?? "").replace(/,/g, "")) as any}
+                      />
+                    </Form.Item>
+                    <Form.Item noStyle shouldUpdate>
+                      {({ getFieldValue }) => {
+                        const t = getFieldValue(["monthTiers", field.name]) || {};
+                        return t.months && t.monthPrice ? (
+                          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                            нийт {(t.months * t.monthPrice).toLocaleString()}₮
+                          </Typography.Text>
+                        ) : null;
+                      }}
+                    </Form.Item>
+                    <a onClick={() => remove(field.name)}>Хасах</a>
+                  </Space>
+                ))}
+                <Button type="dashed" onClick={() => add()} style={{ width: 360 }}>
+                  Хямдралын шат нэмэх
+                </Button>
+              </>
+            )}
+          </Form.List>
         </Card>
 
         {editable && (

@@ -59,13 +59,19 @@ export function PurchaseModal({
   const { data: pricing } = usePricing(student?._id);
   const price: number = pricing?.lessonPrice ?? 0;
   const packages: number[] = (pricing?.packages ?? []).map((p: any) => p.lessons);
+  /** N оролтын дүн — серверийн `amountFor`-той ижил дүрэм (олон сарын хямдрал). */
+  const amountOf = (n: number) => {
+    let unit = price;
+    for (const t of pricing?.tiers ?? []) if (n >= t.minLessons) unit = t.lessonPrice;
+    return Math.round(unit * n);
+  };
 
   useEffect(() => {
     if (open) {
       const lessons = packages[0] ?? 8;
       form.setFieldsValue({
         lessons,
-        amount: lessons * price,
+        amount: amountOf(lessons),
         method: "CASH",
         paidAt: dayjs(),
         note: "",
@@ -91,7 +97,7 @@ export function PurchaseModal({
   });
 
   const setLessons = (n: number) =>
-    form.setFieldsValue({ lessons: n, amount: n * price });
+    form.setFieldsValue({ lessons: n, amount: amountOf(n) });
 
   return (
     <Modal
@@ -108,7 +114,10 @@ export function PurchaseModal({
         <Form.Item label="Багц">
           <Radio.Group
             optionType="button"
-            options={packages.map((n) => ({ value: n, label: `${n} оролт` }))}
+            options={(pricing?.packages ?? []).map((p: any) => ({
+              value: p.lessons,
+              label: `${p.lessons} оролт · ${money(p.amount)}`,
+            }))}
             onChange={(e) => setLessons(e.target.value)}
           />
         </Form.Item>
@@ -122,13 +131,20 @@ export function PurchaseModal({
               min={1}
               max={96}
               style={{ width: 120 }}
-              onChange={(v) => v && form.setFieldsValue({ amount: Number(v) * price })}
+              onChange={(v) => v && form.setFieldsValue({ amount: amountOf(Number(v)) })}
             />
           </Form.Item>
           <Form.Item
             name="amount"
             label="Төлсөн дүн (₮)"
-            extra={price ? `1 оролт = ${money(price)}` : "Тохиргоонд оролтын үнэ тавиагүй"}
+            extra={
+              price
+                ? `1 оролт = ${money(price)}` +
+                  (pricing?.tiers?.length
+                    ? ` · ${pricing.tiers.map((t: any) => `${t.months}+ сар ${money(t.monthPrice)}/сар`).join(", ")}`
+                    : "")
+                : "Тохиргоонд оролтын үнэ тавиагүй"
+            }
           >
             <InputNumber
               min={0}
