@@ -168,7 +168,11 @@ export function AdjustmentModal({
                 dataIndex: "delta",
                 width: 70,
                 render: (v, r: any) => (
-                  <Tag color={r.voidedAt ? "default" : v > 0 ? "green" : "red"}>
+                  <Tag
+                    color={
+                      r.voidedAt || v === 0 ? "default" : v > 0 ? "green" : "red"
+                    }
+                  >
                     {v > 0 ? `+${v}` : v}
                   </Tag>
                 ),

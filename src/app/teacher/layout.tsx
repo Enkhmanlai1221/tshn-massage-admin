@@ -5,6 +5,7 @@ import {
   CalendarOutlined,
   CheckSquareOutlined,
   DollarOutlined,
+  FormOutlined,
   LogoutOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
@@ -16,6 +17,8 @@ const NAV = [
   { key: "/teacher", label: "Өнөөдөр", icon: <CheckSquareOutlined /> },
   { key: "/teacher/schedule", label: "Хуваарь", icon: <CalendarOutlined /> },
   { key: "/teacher/students", label: "Сурагч", icon: <TeamOutlined /> },
+  // ТҮР: оролтын үлдэгдэл жигдрүүлэх (дууссаны дараа хасна).
+  { key: "/teacher/balance", label: "Оролт", icon: <FormOutlined /> },
   { key: "/teacher/salary", label: "Цалин", icon: <DollarOutlined /> },
 ];
 

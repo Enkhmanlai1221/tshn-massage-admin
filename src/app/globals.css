@@ -175,3 +175,9 @@ body {
     font-size: 13px;
   }
 }
+
+/* ТҮР: багшийн «Оролт тааруулах» — тоо голдоо, 16px (iOS томруулахгүй). */
+.balance-input input {
+  text-align: center !important;
+  font-size: 16px !important;
+}
