@@ -294,6 +294,7 @@ function PayoutDrawer({ id, onClose }: { id: string | null; onClose: () => void 
               <Tag color={data.status === "PAID" ? "green" : "orange"}>
                 {SALARY_STATUS_LABEL[data.status]}
               </Tag>
+              {data.confirmedByTeacher && <Tag color="blue">Багш «авсан» гэж баталгаажуулсан</Tag>}
               {data.paidAt && (
                 <Typography.Text type="secondary">
                   {dayjs(data.paidAt).format("YYYY-MM-DD HH:mm")}
@@ -496,10 +497,13 @@ export default function SalaryPage() {
                     {
                       title: "Төлөв",
                       dataIndex: "status",
-                      render: (v) => (
-                        <Tag color={v === "PAID" ? "green" : "orange"}>
-                          {SALARY_STATUS_LABEL[v]}
-                        </Tag>
+                      render: (v, r: any) => (
+                        <>
+                          <Tag color={v === "PAID" ? "green" : "orange"}>
+                            {SALARY_STATUS_LABEL[v]}
+                          </Tag>
+                          {r.confirmedByTeacher && <Tag color="blue">Багш авсан</Tag>}
+                        </>
                       ),
                     },
                     {

@@ -1,155 +1,159 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Skeleton } from "antd";
-import { LeftOutlined, RightOutlined } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
-import dayjs, { Dayjs } from "dayjs";
-import { teacherApi } from "@/lib/teacher-api";
-import { SALARY_STATUS_LABEL, money } from "@/lib/labels";
+import { App, Button, Skeleton } from "antd";
+import { CheckCircleOutlined } from "@ant-design/icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import { teacherApi, teacherApiError } from "@/lib/teacher-api";
+import { money } from "@/lib/labels";
 
 /**
- * Багшийн өөрийн цалин — зөвхөн харах, гар утсанд зориулсан.
+ * Багшийн цалин — САРААР БИШ, сүүлд цалин авснаас хойш хуримтлагдсан
+ * «авах ёстой» дүн. Цалингаа авмагц багш «Цалин авсан» дарна — тэр мөчөөс
+ * тоолуур 0-ээс эхэлж, олголт түүхэнд бичигдэнэ.
  *
  * Өнгөний дэглэм: том ногоон хайрцаг байхгүй — зөвхөн ТОО нь ногоон.
- * Задаргаа нь өнгөт шошго биш, саарал мөрүүд (тод өнгө зөвхөн үйл явдалд).
  */
 export default function TeacherSalaryPage() {
-  const [month, setMonth] = useState<Dayjs>(dayjs());
-  const monthKey = month.format("YYYY-MM");
+  const { message, modal } = App.useApp();
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["teacher-salary", monthKey],
-    queryFn: async () =>
-      (await teacherApi.get("/salary", { params: { monthKey } })).data,
+    queryKey: ["teacher-salary", "owed"],
+    queryFn: async () => (await teacherApi.get("/salary/owed")).data,
   });
 
-  return (
-    <div>
-      <div
-        style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}
-      >
-        <Button
-          icon={<LeftOutlined />}
-          onClick={() => setMonth(month.add(-1, "month"))}
-          aria-label="Өмнөх сар"
-          style={{ width: 36, height: 36, flexShrink: 0 }}
-        />
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>
-            Цалин
-          </div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 3 }}>
-            {month.format("YYYY оны MM сар")}
+  const received = useMutation({
+    mutationFn: async (amount: number) =>
+      (await teacherApi.post("/salary/received", { amount })).data,
+    onSuccess: (res) => {
+      message.success(res.message);
+      qc.invalidateQueries({ queryKey: ["teacher-salary"] });
+      qc.invalidateQueries({ queryKey: ["teacher-students"] });
+      qc.invalidateQueries({ queryKey: ["teacher-student"] });
+    },
+    onError: (e) => {
+      message.error(teacherApiError(e));
+      qc.invalidateQueries({ queryKey: ["teacher-salary"] });
+    },
+  });
+
+  const total: number = data?.total ?? 0;
+  const lessons: number = (data?.lessonCount ?? 0) + (data?.priorCount ?? 0);
+  const last = data?.lastPaid;
+
+  const confirmReceived = () =>
+    modal.confirm({
+      title: "Цалингаа авсан уу?",
+      content: (
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 700, margin: "6px 0" }}>{money(total)}</div>
+          <div style={{ color: "#6b7280", fontSize: 13 }}>
+            {lessons} хичээлийн цалин «авсан» гэж бүртгэгдэж, тоолуур 0-ээс
+            эхэлнэ. Буцаах боломжгүй.
           </div>
         </div>
-        <Button
-          icon={<RightOutlined />}
-          onClick={() => setMonth(month.add(1, "month"))}
-          aria-label="Дараагийн сар"
-          style={{ width: 36, height: 36, flexShrink: 0 }}
-        />
+      ),
+      okText: "Тийм, авсан",
+      cancelText: "Болих",
+      onOk: () => received.mutateAsync(total),
+    });
+
+  return (
+    <div style={{ paddingBottom: 72 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, marginBottom: 12 }}>
+        Цалин
       </div>
 
       {isLoading ? (
-        <Skeleton active paragraph={{ rows: 5 }} />
+        <Skeleton active paragraph={{ rows: 6 }} />
       ) : (
         <>
-          {/* ЦАЛИН АВСНААС ХОЙШ — сараас үл хамаарах, хамгийн чухал тоо. */}
-          {data?.sincePayout && (
-            <div
-              className="lesson-card"
-              style={{ padding: "16px", display: "flex", alignItems: "center", gap: 12 }}
-            >
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  Цалин авснаас хойш
-                </div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                  {data.sincePayout.lastPeriodTo
-                    ? `Сүүлд ${data.sincePayout.lastPeriodTo} хүртэлх хугацааны цалин авсан`
-                    : "Одоогоор цалин олгогдоогүй"}
-                  {data.sincePayout.prior > 0 &&
-                    ` · үүнээс өмнө орсон ${data.sincePayout.prior}`}
-                </div>
-              </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 28, fontWeight: 700, lineHeight: 1, color: "#15803d" }}>
-                  {data.sincePayout.total}
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280" }}>хичээл</div>
-              </div>
-            </div>
-          )}
-
-          {/* Гол дүн — том, тод */}
-          <div
-            className="lesson-card"
-            style={{ padding: "20px 16px", textAlign: "center" }}
-          >
-            <div style={{ fontSize: 12, color: "#6b7280" }}>Хүлээгдэж буй</div>
+          {/* АВАХ ЁСТОЙ ЦАЛИН — хамгийн чухал тоо */}
+          <div className="lesson-card" style={{ padding: "20px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>Авах цалин</div>
             <div
               style={{
-                fontSize: 32,
+                fontSize: 34,
                 fontWeight: 700,
                 lineHeight: 1.2,
                 marginTop: 4,
+                color: total ? "#15803d" : "#111827",
               }}
             >
-              {money(data?.pendingAmount ?? 0)}
+              {money(total)}
             </div>
             <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
-              {data?.pendingLessons ?? 0} хичээл
+              {data?.lessonCount ?? 0} хичээл
+              {data?.priorCount > 0 && ` · өмнө орсон ${data.priorCount}`}
             </div>
-          </div>
-
-          {/* Олгогдсон + задаргаа — нэг картад */}
-          <div className="lesson-card">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                fontSize: 13,
-              }}
-            >
-              <span style={{ color: "#4b5563" }}>Энэ сар олгогдсон</span>
-              <b style={{ color: "#15803d", fontSize: 15 }}>
-                {money(data?.paidAmount ?? 0)}
-              </b>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 8 }}>
+              {last
+                ? `Сүүлд ${dayjs(last.paidAt).format("YYYY-MM-DD")}-нд ${money(last.totalAmount)} авсан`
+                : "Одоогоор цалин аваагүй"}
             </div>
-            {!!data?.breakdown?.length && (
-              <>
-                <div
-                  style={{ height: 1, background: "#f0f1f3", margin: "12px 0" }}
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 9,
-                    fontSize: 13,
-                  }}
-                >
-                  {data.breakdown.map((b: any) => (
-                    <div
-                      key={b.status}
-                      style={{ display: "flex", justifyContent: "space-between" }}
-                    >
-                      <span style={{ color: "#4b5563" }}>{b.label}</span>
-                      <span style={{ fontWeight: 600 }}>{b.count}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
+            {data?.draftAmount > 0 && (
+              <div style={{ fontSize: 12, color: "#b45309", marginTop: 4 }}>
+                Үүнээс админы бэлдсэн тооцоо {money(data.draftAmount)}
+              </div>
             )}
+
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<CheckCircleOutlined />}
+              disabled={!total}
+              loading={received.isPending}
+              onClick={confirmReceived}
+              style={{ marginTop: 16, height: 48 }}
+            >
+              Цалин авсан
+            </Button>
           </div>
 
-          {/* Дүрэм — үргэлж ил, нугалж нуухгүй (нэг л удаа уншина). */}
+          {/* СУРАГЧ БҮРЭЭР */}
+          {!!data?.students?.length && (
+            <>
+              <div className="section-label" style={{ marginTop: 6 }}>
+                СУРАГЧ БҮРЭЭР · {data.students.length}
+              </div>
+              <div className="row-card" style={{ marginBottom: 16 }}>
+                {data.students.map((r: any) => {
+                  const st = r.student ?? {};
+                  const name = [st.lastName ? `${st.lastName.slice(0, 1)}.` : "", st.firstName]
+                    .filter(Boolean)
+                    .join("");
+                  return (
+                    <div
+                      key={String(st._id)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px" }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="lesson-card__name" style={{ fontSize: 14, fontWeight: 600 }}>
+                          {name || "—"}
+                          {st.isGroup && (
+                            <span style={{ fontSize: 11, color: "#7c3aed", fontWeight: 500 }}> · групп</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1 }}>
+                          {r.lessons} хичээл
+                          {r.prior > 0 && ` · өмнө орсон ${r.prior}`}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, flexShrink: 0 }}>
+                        {money(r.amount)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Дүрэм — үргэлж ил */}
           <div className="lesson-card" style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
-              Цалин хэрхэн тооцогддог вэ?
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>Цалин хэрхэн тооцогддог вэ?</div>
             <div
               style={{
                 fontSize: 13,
@@ -164,21 +168,16 @@ export default function TeacherSalaryPage() {
               <b style={{ color: "#111827" }}>3 хүртэл</b> удаа тасалбал
               сануулга — цалинд орохгүй.{" "}
               <b style={{ color: "#111827" }}>4 дэх удаагаас</b> цалинд орно.
-              Чөлөө авсан хичээл нөхөгдсөн үед тооцогдоно.
+              Чөлөө авсан хичээл нөхөгдсөн үед тооцогдоно. Цалингаа авмагц
+              «Цалин авсан» дарна уу.
             </div>
           </div>
 
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>
-            Олголтын түүх
-          </div>
+          {/* ОЛГОЛТЫН ТҮҮХ */}
+          <div className="section-label">ОЛГОЛТЫН ТҮҮХ</div>
           {!data?.payouts?.length ? (
-            <div
-              className="lesson-card"
-              style={{ padding: "28px 16px", textAlign: "center" }}
-            >
-              <div style={{ fontSize: 13, color: "#9ca3af" }}>
-                Олголт хараахан хийгдээгүй
-              </div>
+            <div className="lesson-card" style={{ padding: "28px 16px", textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: "#9ca3af" }}>Олголт хараахан хийгдээгүй</div>
             </div>
           ) : (
             <div className="row-card">
@@ -187,21 +186,12 @@ export default function TeacherSalaryPage() {
                 return (
                   <div
                     key={p._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "12px 14px",
-                    }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600 }}>
-                        {money(p.totalAmount)}
-                      </div>
-                      <div
-                        style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}
-                      >
-                        {p.periodFrom} — {p.periodTo} · {p.lessonCount} хичээл
+                      <div style={{ fontSize: 15, fontWeight: 600 }}>{money(p.totalAmount)}</div>
+                      <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                        {p.periodFrom} — {p.periodTo} · {(p.lessonCount ?? 0) + (p.priorCount ?? 0)} хичээл
                       </div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -209,6 +199,7 @@ export default function TeacherSalaryPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "flex-end",
                           gap: 6,
                           fontSize: 12,
                           fontWeight: 600,
@@ -224,17 +215,11 @@ export default function TeacherSalaryPage() {
                             display: "inline-block",
                           }}
                         />
-                        {SALARY_STATUS_LABEL[p.status]}
+                        {paid ? (p.confirmedByTeacher ? "Авсан" : "Олгосон") : "Ноорог"}
                       </div>
                       {p.paidAt && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#9ca3af",
-                            marginTop: 3,
-                          }}
-                        >
-                          {dayjs(p.paidAt).format("MM/DD")}
+                        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 3 }}>
+                          {dayjs(p.paidAt).format("YYYY-MM-DD")}
                         </div>
                       )}
                     </div>
@@ -244,14 +229,7 @@ export default function TeacherSalaryPage() {
             </div>
           )}
 
-          <div
-            style={{
-              fontSize: 12,
-              color: "#9ca3af",
-              textAlign: "center",
-              marginTop: 14,
-            }}
-          >
+          <div style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", marginTop: 14 }}>
             Асуулт байвал админд хандана уу.
           </div>
         </>
