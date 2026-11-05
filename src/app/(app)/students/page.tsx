@@ -99,7 +99,16 @@ export default function StudentsPage() {
             title: "Түвшин",
             dataIndex: "level",
             key: "level",
-            render: (v) => STUDENT_LEVEL_LABEL[v] || "—",
+            render: (v, r: any) => (
+              <>
+                {STUDENT_LEVEL_LABEL[v] || "—"}
+                {r.isGroup && (
+                  <Tag color="purple" style={{ marginLeft: 6 }}>
+                    Групп
+                  </Tag>
+                )}
+              </>
+            ),
           },
           {
             title: "Утас",
@@ -154,6 +163,7 @@ export default function StudentsPage() {
           instrument: r.instrument?._id ?? r.instrument,
           teacher: r.teacher?._id ?? r.teacher,
           birthday: r.birthday ? dayjs(r.birthday) : undefined,
+          isGroup: !!r.isGroup,
         })}
         toPayload={(v) => ({
           ...v,
@@ -240,6 +250,21 @@ export default function StudentsPage() {
                   <Select
                     placeholder="Сонгох"
                     options={opts(STUDENT_LEVEL_LABEL)}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="isGroup"
+                  label="Хичээлийн хэлбэр"
+                  initialValue={false}
+                  extra="Групп бол багшийн цалин, сурагчийн үнэ хөгжмийн группийн ханшаар бодогдоно."
+                >
+                  <Select
+                    options={[
+                      { value: false, label: "Ганцаарчилсан" },
+                      { value: true, label: "Групп" },
+                    ]}
                   />
                 </Form.Item>
               </Col>

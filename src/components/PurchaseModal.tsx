@@ -25,11 +25,16 @@ const METHOD_OPTIONS = [
   { value: "CARD", label: "Карт" },
 ];
 
-/** Нэг оролтын үнэ + багцууд (PAYMENT эрхээр уншина). */
-export const usePricing = () =>
+/**
+ * Нэг оролтын үнэ + багцууд (PAYMENT эрхээр уншина). `studentId` өгвөл тухайн
+ * сурагчийн хөгжим, ганцаарчилсан/группээр бодсон үнэ.
+ */
+export const usePricing = (studentId?: string | null) =>
   useQuery({
-    queryKey: ["payment-pricing"],
-    queryFn: async () => (await api.get("/payment/pricing")).data,
+    queryKey: ["payment-pricing", studentId ?? null],
+    queryFn: async () =>
+      (await api.get("/payment/pricing", { params: studentId ? { student: studentId } : {} }))
+        .data,
     staleTime: 60_000,
   });
 
@@ -51,7 +56,7 @@ export function PurchaseModal({
   const { message } = App.useApp();
   const qc = useQueryClient();
   const [form] = Form.useForm();
-  const { data: pricing } = usePricing();
+  const { data: pricing } = usePricing(student?._id);
   const price: number = pricing?.lessonPrice ?? 0;
   const packages: number[] = (pricing?.packages ?? []).map((p: any) => p.lessons);
 
